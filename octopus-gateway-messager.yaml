@@ -1,0 +1,111 @@
+apiVersion: v1
+data:
+  dev.env.json: |
+    {
+      "name": "messenger",
+      "port": 7004,
+      "chain": {
+        "testnet": {
+          "rpc": ["http://dl-testnet:9933"],
+          "ws": ["ws://dl-testnet:9944"],
+          "processors": ["node", "cache"]
+        }
+      },
+      "pool": 1
+    }
+kind: ConfigMap
+metadata:
+  name: messager-dev-config
+
+---
+apiVersion: v1
+data:
+  testnet.json: |
+    {
+      "processor": {
+        "cache": [
+          "system_name",
+          "system_version",
+          "system_chain",
+          "system_chainType",
+          "system_properties",
+          "system_networkState",
+          "author_pendingExtrinsics",
+          "chain_getHeader", 
+          "chain_getBlock", 
+          "chain_getBlockHash", 
+          "chain_getFinalizedHead",
+          "state_getMetadata", 
+          "state_getRuntimeVersion", 
+          "system_peers",
+          "system_syncState",
+          "system_health",
+          "rpc_methods"
+        ],
+        "subscription": [
+          "state_subscribeStorage",
+          "state_unsubscribeStorage",
+          "chain_subscribeNewHeads",
+          "chain_unsubscribeNewHeads",
+          "chain_subscribeAllHeads",
+          "chain_unsubscribeAllHeads",
+          "chain_subscribeFinalizedHeads",
+          "chain_unsubscribeFinalizedHeads"
+        ],
+        "history": [
+        ]
+      }
+    }
+kind: ConfigMap
+metadata:
+  name: messager-chain-config
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octora-messager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: octora-messager
+  template:
+    metadata:
+      labels:
+        app: octora-messager
+    spec:
+      containers:
+      - name: octora-messager
+        image: gcr.io/orbital-builder-316023/octora-messager:0.0.1
+        ports:
+        - containerPort: 7004
+        volumeMounts:
+        - name: messager-config
+          mountPath: /app/messager/config/env
+        - name: messager-chain
+          mountPath: /app/messager/config/testnet.json
+          subPath: testnet.json
+      volumes:
+      - name: messager-config
+        configMap:
+          name: messager-dev-config
+      - name: messager-chain
+        configMap:
+          name: messager-chain-config
+          items:
+          - key: testnet.json
+            path: testnet.json
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: octora-messager
+spec:
+  type: ClusterIP
+  selector:
+    app: octora-messager
+  ports:
+  - port: 7004
+    targetPort: 7004

@@ -1,0 +1,80 @@
+apiVersion: v1
+data:
+  dev.env.json: |
+    {
+      "keys": ["stat@#^*&"],
+      "name": "stat",
+      "port": 7002,
+      "session": {
+        "key": "sid",
+        "signed": false,
+        "maxAge": 2592000000,
+        "httpOnly": false
+      },
+      "redis": {
+        "host": "redis-leader",
+        "port": "6379",
+        "password": ""
+      },
+      "limit": {
+        "daily": {
+          "0": 1000000,
+          "1": 5000000
+        },
+        "project": {
+          "0": 20,
+          "1": 100
+        }
+      },
+      "projects": 100,
+      "timeout": 5000,
+      "requests": 1000,
+      "test": true,
+      "chain": {
+        "testnet": {}
+      }
+    }
+kind: ConfigMap
+metadata:
+  name: stat-dev-config
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octora-stat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: octora-stat
+  template:
+    metadata:
+      labels:
+        app: octora-stat
+    spec:
+      containers:
+      - name: octora-stat
+        image: gcr.io/orbital-builder-316023/octora-stat:0.0.1
+        ports:
+        - containerPort: 7002
+        volumeMounts:
+        - name: stat-config
+          mountPath: /app/stat/config/env
+      volumes:
+      - name: stat-config
+        configMap:
+          name: stat-dev-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: octora-stat
+spec:
+  type: ClusterIP
+  selector:
+    app: octora-stat
+  ports:
+  - port: 7002
+    targetPort: 7002
