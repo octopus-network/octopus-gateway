@@ -1,0 +1,47 @@
+
+
+steps:
+# api
+- name: 'gcr.io/cloud-builders/docker'
+  args: 
+  - build
+  - -t
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
+  - -f
+  - Dockerfile.api
+  - .
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - push
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
+# messager
+- name: 'gcr.io/cloud-builders/docker'
+  args: 
+  - build
+  - -t
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+  - -f
+  - Dockerfile.messager
+  - .
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - push
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+# stat
+- name: 'gcr.io/cloud-builders/docker'
+  args: 
+  - build
+  - -t
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
+  - -f
+  - Dockerfile.stat
+  - .
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - push
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
+
+images:
+- asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
+- asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+- asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA

@@ -1,0 +1,11 @@
+FROM node:16.3.0-buster-slim
+
+WORKDIR /app
+
+COPY ./lib ./lib
+RUN cd /app/lib && npm install --only=production
+
+COPY ./messager ./messager
+RUN cd /app/messager && npm install --only=production
+
+CMD ["node", "messager/app.js"]

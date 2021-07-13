@@ -1,4 +1,7 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: messager-dev-config
 data:
   dev.env.json: |
     {
@@ -13,9 +16,6 @@ data:
       },
       "pool": 1
     }
-kind: ConfigMap
-metadata:
-  name: messager-dev-config
 
 ---
 apiVersion: v1
@@ -64,20 +64,20 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octora-messager
+  name: octopus-gateway-messager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: octora-messager
+      app: octopus-gateway-messager
   template:
     metadata:
       labels:
-        app: octora-messager
+        app: octopus-gateway-messager
     spec:
       containers:
-      - name: octora-messager
-        image: gcr.io/orbital-builder-316023/octora-messager:0.0.1
+      - name: octopus-gateway-messager
+        image: asia-northeast1-docker.pkg.dev/orbital-builder-316023/docker-repository/octopus-gateway-messager:0.0.1
         ports:
         - containerPort: 7004
         volumeMounts:
@@ -101,11 +101,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: octora-messager
+  name: octopus-gateway-messager
 spec:
   type: ClusterIP
   selector:
-    app: octora-messager
+    app: octopus-gateway-messager
   ports:
   - port: 7004
     targetPort: 7004
