@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: messager-dev-config
+  name: messenger-dev-config
 data:
   dev.env.json: |
     {
@@ -58,41 +58,41 @@ data:
     }
 kind: ConfigMap
 metadata:
-  name: messager-chain-config
+  name: messenger-chain-config
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octopus-gateway-messager
+  name: octopus-gateway-messenger
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: octopus-gateway-messager
+      app: octopus-gateway-messenger
   template:
     metadata:
       labels:
-        app: octopus-gateway-messager
+        app: octopus-gateway-messenger
     spec:
       containers:
-      - name: octopus-gateway-messager
-        image: asia-northeast1-docker.pkg.dev/orbital-builder-316023/docker-repository/octopus-gateway-messager:0.0.1
+      - name: octopus-gateway-messenger
+        image: asia-northeast1-docker.pkg.dev/orbital-builder-316023/docker-repository/octopus-gateway-messenger:0.0.1
         ports:
         - containerPort: 7004
         volumeMounts:
-        - name: messager-config
-          mountPath: /app/messager/config/env
-        - name: messager-chain
-          mountPath: /app/messager/config/testnet.json
+        - name: messenger-config
+          mountPath: /app/messenger/config/env
+        - name: messenger-chain
+          mountPath: /app/messenger/config/testnet.json
           subPath: testnet.json
       volumes:
-      - name: messager-config
+      - name: messenger-config
         configMap:
-          name: messager-dev-config
-      - name: messager-chain
+          name: messenger-dev-config
+      - name: messenger-chain
         configMap:
-          name: messager-chain-config
+          name: messenger-chain-config
           items:
           - key: testnet.json
             path: testnet.json
@@ -101,11 +101,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: octopus-gateway-messager
+  name: octopus-gateway-messenger
 spec:
   type: ClusterIP
   selector:
-    app: octopus-gateway-messager
+    app: octopus-gateway-messenger
   ports:
   - port: 7004
     targetPort: 7004

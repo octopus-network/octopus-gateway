@@ -14,19 +14,19 @@ steps:
   args:
   - push
   - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
-# messager
+# messenger
 - name: 'gcr.io/cloud-builders/docker'
   args: 
   - build
   - -t
-  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
   - -f
-  - Dockerfile.messager
+  - Dockerfile.messenger
   - .
 - name: 'gcr.io/cloud-builders/docker'
   args:
   - push
-  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+  - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
 # stat
 - name: 'gcr.io/cloud-builders/docker'
   args: 
@@ -43,5 +43,5 @@ steps:
 
 images:
 - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
-- asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messager:$SHORT_SHA
+- asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
 - asia-northeast1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
