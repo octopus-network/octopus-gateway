@@ -5,7 +5,7 @@ const {
 const superagent = require('superagent')
 
 let accept = async function (id, ws, request) {
-    let reg = /^\/([a-zA-Z]{0,20})\/([a-z0-9]{32})$/
+    let reg = /^\/([-a-zA-Z0-9]{0,32})\/([a-z0-9]{32})$/
     let path = url.parse(request.url).path
     if (reg.test(path)) {
         let chain_pid = reg.exec(path)
