@@ -8,6 +8,7 @@ const {
 const CODE = require('../../../lib/helper/code')
 const crypto = require("crypto");
 const { toJSON } = require("../../../lib/helper/assist")
+const publishMessage = require("../pubsub/producer")
 
 let api = async (ctx, next) => {
     let chain = ctx.request.params.chain.toLowerCase()
@@ -36,6 +37,26 @@ let api = async (ctx, next) => {
                 })
             })
         })()
+
+        //上报
+        let ip = (ctx.request.header['x-forwarded-for'] ? ctx.request.header['x-forwarded-for'].split(/\s*,\s/[0]) : null) || ''
+        publishMessage({
+            'key': 'request',
+            'message': {
+                protocol: ctx.request.protocol,
+                header: ctx.request.header,
+                ip: ip,
+                chain: chain,
+                pid: pid,
+                method: req.method,
+                req: req,
+                resp: '', //暂时用不上，省空间　res.body,
+                code: 200,
+                bandwidth: toJSON(ctx.response.body).length,
+                start: start,
+                end: end
+            }
+        })
     } else {
         logger.error(chain, pid, check.body)
         ctx.response.body = check.body

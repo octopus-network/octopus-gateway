@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stat-dev-config
+data:
+  dev.env.json: |
+    {
+      "keys": ["stat@#^*&"],
+      "name": "stat",
+      "port": 7002,
+      "session": {
+        "key": "sid",
+        "signed": false,
+        "maxAge": 2592000000,
+        "httpOnly": false
+      },
+      "redis": {
+        "host": "10.151.108.123",
+        "port": "6378",
+        "password": "",
+        "cert": ""
+      },
+      "pubsub": {
+        "topic": "gateway-dev",
+        "subscription": "gateway-dev-sub"
+      },
+      "limit": {
+        "daily": {
+          "0": 1000000,
+          "1": 5000000
+        },
+        "project": {
+          "0": 20,
+          "1": 100
+        }
+      },
+      "projects": 100,
+      "timeout": 5000,
+      "requests": 1000,
+      "test": true,
+      "chain": {
+        "testnet": {}
+      }
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stat-dev-secret
+type: Opaque
+data:
+  redis.password: NjgyMWJ...
+  redis.tls.cert: LS0tLS1... # type: kubernetes.io/tls
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octopus-gateway-stat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: octopus-gateway-stat
+  template:
+    metadata:
+      labels:
+        app: octopus-gateway-stat
+    spec:
+      containers:
+      - name: octopus-gateway-stat
+        image: asia-northeast1-docker.pkg.dev/orbital-builder-316023/docker-repository/octopus-gateway-stat:0.0.1
+        ports:
+        - containerPort: 7002
+        volumeMounts:
+        - name: stat-config
+          mountPath: /app/stat/config/env
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stat-dev-secret
+              key: redis.password
+        - name: REDIS_TLS_CRT
+          valueFrom:
+            secretKeyRef:
+              name: stat-dev-secret
+              key: redis.tls.cert
+      volumes:
+      - name: stat-config
+        configMap:
+          name: stat-dev-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: octopus-gateway-stat
+spec:
+  type: ClusterIP
+  selector:
+    app: octopus-gateway-stat
+  ports:
+  - port: 7002
+    targetPort: 7002

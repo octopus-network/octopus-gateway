@@ -14,6 +14,7 @@ const {
 } = require('./src/routers/ws')
 const crypto = require("crypto");
 const Messengers = require("./src/api/messenger")
+const publishMessage = require("./src/pubsub/producer")
 
 app.keys = config.keys
 app
@@ -68,6 +69,14 @@ let wss = new WebSocketServer({
 });
 wss.on('connection', function (ws, request) {
     logger.info('wss connection ', wss.clients.size)
+    publishMessage({
+        'key': 'connections',
+        'message': {
+            protocol: 'websocket',
+            pid: process.pid, //考虑多进程
+            connections: wss.clients.size
+        }
+    });
     let id = crypto.randomBytes(16).toString('hex');
     accept(id, ws, request)
 })

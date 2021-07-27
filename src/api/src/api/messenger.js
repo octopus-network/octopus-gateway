@@ -11,6 +11,8 @@ const {
     fromJSON
 } = require("../../../lib/helper/assist")
 const Pool = require("./pool")
+const publishMessage = require("../pubsub/producer")
+
 class Messengers {
     constructor() {
         this.conWs = {}
@@ -111,7 +113,7 @@ class Messengers {
                         "params": [message.response.params.subscription],
                         "id": 1
                     }
-                })
+                }, true)
             }
         }
     }
@@ -169,20 +171,23 @@ class Messengers {
     }
 
     wsClose(id, chain) {
+        const subIds = []
         for (let method in this.conWs[id].unsubscription_msg) {
-            for (let subId of this.conWs[id].unsubscription_msg[method]) {
-                this.messengers[chain].send({
-                    "id": id,
-                    "chain": chain,
-                    "request": {
-                        "jsonrpc": '2.0',
-                        "method": method,
-                        "params": [subId],
-                        "id": 1
-                    }
-                })
-            }
+            subIds.push(...this.conWs[id].unsubscription_msg[method])
         }
+        if( subIds.length > 0 ) {
+            this.messengers[chain].send({
+                "id": id,
+                "chain": chain,
+                "request": {
+                    "jsonrpc": '2.0',
+                    "method": 'state_unsubscribeStorage',
+                    "params": subIds,
+                    "id": 1
+                }
+            }, true)
+        }
+
         for (let messenger of this.messengers[chain].messengers) {
             if (messenger.channel_clientID.has(id)) {
                 messenger.channel_clientID.delete(id)
@@ -206,6 +211,33 @@ class Messengers {
     }
 
     report(id, response) {
+        try {
+            if (this.conWs[id] && this.conWs[id].request) {
+                let request = this.conWs[id].request
+                let ip = (request.headers['x-forwarded-for'] ? request.headers['x-forwarded-for'].split(/\s*,\s/ [0]) : null) || request.socket.remoteAddress || ''
+
+                publishMessage({
+                    'key': 'request',
+                    'message': {
+                        protocol: 'websocket',
+                        header: request.headers,
+                        ip: ip,
+                        chain: this.conWs[id].chain,
+                        pid: this.conWs[id].pid,
+                        method: response.method ? response.method : 'system_health',
+                        req: '',
+                        resp: '', //暂时用不上，省空间 message,
+                        code: 200,
+                        bandwidth: toJSON(response).length,
+                        start: (new Date()).getTime(),
+                        end: (new Date()).getTime()
+                    }
+                })
+            }
+
+        } catch (e) {
+            logger.error('Stat Error', e)
+        }
     }
 }
 

@@ -10,6 +10,10 @@ data:
       "messengers": {
         "testnet": ["ws://octopus-gateway-messenger:7004"]
       },
+      "pubsub": {
+        "topic": "gateway-dev",
+        "subscription": "gateway-dev-sub"
+      },
       "pool": 10,
       "statServer": "octopus-gateway-stat:7002"
     }

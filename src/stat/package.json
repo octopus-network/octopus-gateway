@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@google-cloud/pubsub": "^2.16.1",
     "commander": "^6.2.0",
     "extend": "^3.0.2",
     "ioredis": "^4.17.3",
