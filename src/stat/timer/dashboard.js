@@ -67,23 +67,40 @@ async function data(date) {
     return data
 }
 
+// (async function () {
+//     try {
+//         while (true) {
+//             await sleep(30000)
+//             let oneday = 24 * 60 * 60 * 1000
+//             let today = (new Date()).getTime()
+
+//             let week = {}
+//             for (var i = 0; i < 30; i++) {
+//                 let date = formateDate(new Date(today - i * oneday))
+//                 week[date] = await data(date)
+//             }
+
+//             await redis.set(KEY.DASHBOARD(), JSON.stringify(week))
+//         }
+//     } catch (e) {
+//         logger.error('update dashboard error!', e)
+//         process.exit(0)
+//     }
+// })()
+
 (async function () {
     try {
-        while (true) {
-            await sleep(30000)
-            let oneday = 24 * 60 * 60 * 1000
-            let today = (new Date()).getTime()
-
-            let week = {}
-            for (var i = 0; i < 30; i++) {
-                let date = formateDate(new Date(today - i * oneday))
-                week[date] = await data(date)
-            }
-
-            await redis.set(KEY.DASHBOARD(), JSON.stringify(week))
+        let oneday = 24 * 60 * 60 * 1000
+        let today = (new Date()).getTime()
+        let week = {}
+        for (var i = 0; i < 30; i++) {
+            let date = formateDate(new Date(today - i * oneday))
+            week[date] = await data(date)
         }
+        await redis.set(KEY.DASHBOARD(), JSON.stringify(week))
+        process.exit(0)
     } catch (e) {
         logger.error('update dashboard error!', e)
-        process.exit(0)
+        process.exit(1)
     }
 })()
