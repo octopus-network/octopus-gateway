@@ -21,10 +21,10 @@ function listenForMessages() {
             default:
                 break
         }
-        logger.info(message.data)
-
         // "Ack" (acknowledge receipt of) the message
         message.ack()
+
+        logger.info(message.data)
     })
 
     subscription.on('error', error => {

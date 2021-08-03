@@ -31,14 +31,14 @@ class Pool {
                 channel_clientID
             } = this.messengers[index]
             await sleep(20000)
-            this.oncloseCallback(channel_clientID)
+            this.oncloseCallback(chain, channel_clientID)
             channel_clientID.clear()
             this.messengers[index].ws = this.initConnect(index, chain, path) //重连
             console.log('reconnect ', index, chain, path)
         })
         mess.on('open', async () => {
             console.log(chain + " messenger open")
-            mess.on('message', (data) => this.callback(data, index))
+            mess.on('message', (data) => this.callback(chain, data, index))
         })
 
         return mess

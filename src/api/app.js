@@ -97,3 +97,19 @@ process.on('uncaughtException', function (e) {
     logger.error('uncaughtException', e)
 })
 logger.info(config.name, ' started listen on ', config.port)
+
+
+// watch etcd config
+const extend = require('extend')
+const etcdConfig = require('./config/etcd')
+etcdConfig(data => {
+    extend(config, JSON.parse(data))
+    console.log('changed', config)
+    global.messengers.changed()
+}).then(data => {
+    extend(config, JSON.parse(data))
+    console.log('load', config)
+    global.messengers.changed()
+}).catch(err => {
+    throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+})

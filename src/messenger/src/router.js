@@ -105,6 +105,26 @@ class Router {
             }
         }
     }
+
+    // call after etcd config changed
+    changed() {
+        for (const chain in config.chain) {
+            // if (typeof this.processors[chain] === 'undefined')
+            if (!this.processors[chain]) {
+                let processors = config.chain[chain].processors
+                // ???
+                if (processors) {
+                    this.processors[chain] = {}
+                    for (var i = 0; i < processors.length; i++) {
+                        let P = require('./processor/' + processors[i] + '.js');
+                        let p = new P(this, chain)
+                        console.log(p)
+                        this.processors[chain][p.name()] = p
+                    }
+                }
+            }
+        }
+    }
 }
 
 module.exports = Router
