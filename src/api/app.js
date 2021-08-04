@@ -108,7 +108,7 @@ etcdConfig(data => {
     global.messengers.changed()
 }).then(data => {
     extend(config, JSON.parse(data))
-    console.log('load', config)
+    console.log('loaded', config)
     global.messengers.changed()
 }).catch(err => {
     throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })

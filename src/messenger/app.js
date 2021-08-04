@@ -102,6 +102,7 @@ etcdConfig((key, val) => {
             extend(true, config.chain[chain], JSON.parse(data[key]))
         }
     }
+    console.log('loaded', config)
     router.changed()
 }).catch(err => {
     throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })

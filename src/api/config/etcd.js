@@ -9,7 +9,7 @@ module.exports = async function etcdConfig(callback) {
         .then(watcher => {
             watcher
                 .on('put', res => {
-                    console.log(key, 'changed to:', res.value.toString())
+                    // console.log(key, 'set to:', res.value.toString())
                     callback(res.value.toString())
                 })
         });
