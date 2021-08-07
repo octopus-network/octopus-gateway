@@ -14,7 +14,7 @@ const {
 } = require('./src/routers/ws')
 const crypto = require("crypto");
 const Messengers = require("./src/api/messenger")
-const publishMessage = require("./src/pubsub/producer")
+const kafka = require("./src/pubsub/producer")
 
 app.keys = config.keys
 app
@@ -69,7 +69,7 @@ let wss = new WebSocketServer({
 });
 wss.on('connection', function (ws, request) {
     logger.info('wss connection ', wss.clients.size)
-    publishMessage({
+    kafka.stat({
         'key': 'connections',
         'message': {
             protocol: 'websocket',

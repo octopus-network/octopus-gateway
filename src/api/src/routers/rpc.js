@@ -8,7 +8,7 @@ const {
 const CODE = require('../../../lib/helper/code')
 const crypto = require("crypto");
 const { toJSON } = require("../../../lib/helper/assist")
-const publishMessage = require("../pubsub/producer")
+const kafka = require("../pubsub/producer")
 
 let api = async (ctx, next) => {
     let chain = ctx.request.params.chain.toLowerCase()
@@ -40,7 +40,7 @@ let api = async (ctx, next) => {
 
         //上报
         let ip = (ctx.request.header['x-forwarded-for'] ? ctx.request.header['x-forwarded-for'].split(/\s*,\s/[0]) : null) || ''
-        publishMessage({
+        kafka.stat({
             'key': 'request',
             'message': {
                 protocol: ctx.request.protocol,

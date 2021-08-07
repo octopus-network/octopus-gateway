@@ -11,7 +11,7 @@ const {
     fromJSON
 } = require("../../../lib/helper/assist")
 const Pool = require("./pool")
-const publishMessage = require("../pubsub/producer")
+const kafka = require("../pubsub/producer")
 
 class Messengers {
     constructor() {
@@ -222,7 +222,7 @@ class Messengers {
                 let request = this.conWs[id].request
                 let ip = (request.headers['x-forwarded-for'] ? request.headers['x-forwarded-for'].split(/\s*,\s/ [0]) : null) || request.socket.remoteAddress || ''
 
-                publishMessage({
+                kafka.stat({
                     'key': 'request',
                     'message': {
                         protocol: 'websocket',
