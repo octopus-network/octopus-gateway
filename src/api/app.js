@@ -14,7 +14,7 @@ const {
 } = require('./src/routers/ws')
 const crypto = require("crypto");
 const Messengers = require("./src/api/messenger")
-const publishMessage = require("./src/pubsub/producer")
+const kafka = require("./src/pubsub/producer")
 
 app.keys = config.keys
 app
@@ -69,7 +69,7 @@ let wss = new WebSocketServer({
 });
 wss.on('connection', function (ws, request) {
     logger.info('wss connection ', wss.clients.size)
-    publishMessage({
+    kafka.stat({
         'key': 'connections',
         'message': {
             protocol: 'websocket',
@@ -97,3 +97,19 @@ process.on('uncaughtException', function (e) {
     logger.error('uncaughtException', e)
 })
 logger.info(config.name, ' started listen on ', config.port)
+
+
+// watch etcd config
+const extend = require('extend')
+const etcdConfig = require('./config/etcd')
+etcdConfig(data => {
+    extend(config, JSON.parse(data))
+    console.log('changed', config)
+    global.messengers.changed()
+}).then(data => {
+    extend(config, JSON.parse(data))
+    console.log('loaded', config)
+    global.messengers.changed()
+}).catch(err => {
+    throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+})

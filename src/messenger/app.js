@@ -71,3 +71,39 @@ process.on('uncaughtException', function (e) {
     logger.error('uncaughtException', e)
 })
 logger.info(config.name, ' started listen on ', config.port)
+
+
+// watch etcd config
+const path = require('path');
+const extend = require('extend')
+const etcdConfig = require('./config/etcd')
+etcdConfig((key, val) => {
+    if (key.endsWith('config.json')) {
+        extend(true, config, JSON.parse(val))
+        console.log('changed', config)
+        router.changed()
+    } else {
+        const chain = path.basename(key, '.json')
+        if (!config.chain[chain]) {
+            config.chain[chain] = {}
+        }
+        extend(true, config.chain[chain], JSON.parse(val))
+        console.log('changed', config)
+    }
+}).then(data => {
+    for (const key in data) {
+        if (key.endsWith('config.json')) {
+            extend(true, config, JSON.parse(data[key]))
+        } else {
+            const chain = path.basename(key, '.json')
+            if (!config.chain[chain]) {
+                config.chain[chain] = {}
+            }
+            extend(true, config.chain[chain], JSON.parse(data[key]))
+        }
+    }
+    console.log('loaded', config)
+    router.changed()
+}).catch(err => {
+    throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+})

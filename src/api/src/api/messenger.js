@@ -11,7 +11,7 @@ const {
     fromJSON
 } = require("../../../lib/helper/assist")
 const Pool = require("./pool")
-const publishMessage = require("../pubsub/producer")
+const kafka = require("../pubsub/producer")
 
 class Messengers {
     constructor() {
@@ -23,71 +23,8 @@ class Messengers {
             this.messengers[chain] = new Pool(
                 chain,
                 config.messengers[chain][0],
-                (message, index) => {
-                    message = fromJSON(message)
-                    if (this.http[message.id]) {
-                        this.http[message.id].callback(message.response)
-                        delete this.http[message.id]
-                        this.messengers[chain].messengers[index].channel_clientID.delete(message.id)
-                    } else if (this.conWs[message.id]) {
-                        if (message.id && message.response.cmd == 'close' && this.conWs[message.id].ws) {
-                            //特定的关闭客户端命令 关闭连接
-                            this.wsClose(message.id, message.chain)
-                            logger.info('Close Client', message.id)
-                        } else {
-                            try {
-                                const msg = toJSON(message.response)
-                                const buffer = Buffer.from(msg);
-                                const len = buffer.length;
-                                const maxReceivedMessageSize = 1024 * 1024;
-                                const maxBufferLen = 1024 * 64;
-                                if (len > maxReceivedMessageSize) {
-                                    for ( let i = 0; i <= Math.floor(len % maxBufferLen); i++ ) {
-                                        if (i !== Math.floor(len % maxBufferLen)) {
-                                            const str = buffer.slice(i * maxBufferLen, (i + 1) * maxBufferLen).toString();
-                                            this.conWs[message.id].ws.send(str, { fin: false });
-                                        } else {
-                                            const str = buffer.slice(i * maxBufferLen).toString();
-                                            this.conWs[message.id].ws.send(str, {fin: true});
-                                        }
-                                    }
-                                } else {
-                                    this.conWs[message.id].ws.send(msg);
-                                }
-                                // 订阅映射，用于app主动断开时，取消messenger内存空间
-                                if (message.response.params && message.response.params.subscription) {
-                                    if (!this.conWs[message.id].unsubscription_msg) {
-                                        this.conWs[message.id].unsubscription_msg = {}
-                                    }
-                                    if (!this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]]) {
-                                        this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]] = new Set()
-                                    }
-                                    this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]].add(message.response.params.subscription)
-                                }
-                                this.report(message.id, message.response) //上报
-                            } catch (e) {
-                                //这里如果出错，就要去messenger取消订阅
-                                logger.error('ws send error', e)
-                                this.sendUnSubscription(message)
-                            }
-                        }
-                        //上报
-                    } else {
-                        this.sendUnSubscription(message)
-                    }
-                },
-                (closeClientIDs) => {
-                    if (closeClientIDs.size === 0) return
-                    //节点的链路断了,通知客户端关闭重连
-                    closeClientIDs.forEach((id) => {
-                        
-                        //特定命令协议
-                        if(this.conWs[id]) {
-                            this.wsClose(id, chain)
-                            logger.info('reportClose', chain)
-                        }
-                    })
-                }
+                (chain, message, index) => this.poolCallback(chain, message, index),
+                (chain, closeClientIDs) => this.poolCloseCallback(chain, closeClientIDs)
             )
         }
         setInterval(() => {
@@ -100,6 +37,75 @@ class Messengers {
             console.log(`channel_clientID: ${length}; wsClients: ${Object.keys(this.conWs).length}; httpClients: ${Object.keys(this.http).length};`)
         }, 10000)
     }
+
+    poolCallback(chain, message, index) {
+        message = fromJSON(message)
+        if (this.http[message.id]) {
+            this.http[message.id].callback(message.response)
+            delete this.http[message.id]
+            console.log(this.messengers[chain].messengers)
+            this.messengers[chain].messengers[index].channel_clientID.delete(message.id)
+        } else if (this.conWs[message.id]) {
+            if (message.id && message.response.cmd == 'close' && this.conWs[message.id].ws) {
+                //特定的关闭客户端命令 关闭连接
+                this.wsClose(message.id, message.chain)
+                logger.info('Close Client', message.id)
+            } else {
+                try {
+                    const msg = toJSON(message.response)
+                    const buffer = Buffer.from(msg);
+                    const len = buffer.length;
+                    const maxReceivedMessageSize = 1024 * 1024;
+                    const maxBufferLen = 1024 * 64;
+                    if (len > maxReceivedMessageSize) {
+                        for ( let i = 0; i <= Math.floor(len % maxBufferLen); i++ ) {
+                            if (i !== Math.floor(len % maxBufferLen)) {
+                                const str = buffer.slice(i * maxBufferLen, (i + 1) * maxBufferLen).toString();
+                                this.conWs[message.id].ws.send(str, { fin: false });
+                            } else {
+                                const str = buffer.slice(i * maxBufferLen).toString();
+                                this.conWs[message.id].ws.send(str, {fin: true});
+                            }
+                        }
+                    } else {
+                        this.conWs[message.id].ws.send(msg);
+                    }
+                    // 订阅映射，用于app主动断开时，取消messenger内存空间
+                    if (message.response.params && message.response.params.subscription) {
+                        if (!this.conWs[message.id].unsubscription_msg) {
+                            this.conWs[message.id].unsubscription_msg = {}
+                        }
+                        if (!this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]]) {
+                            this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]] = new Set()
+                        }
+                        this.conWs[message.id].unsubscription_msg[config['un-subscription'][message.response.method]].add(message.response.params.subscription)
+                    }
+                    this.report(message.id, message.response) //上报
+                } catch (e) {
+                    //这里如果出错，就要去messenger取消订阅
+                    logger.error('ws send error', e)
+                    this.sendUnSubscription(message)
+                }
+            }
+            //上报
+        } else {
+            this.sendUnSubscription(message)
+        }
+    }
+
+    poolCloseCallback(chain, closeClientIDs) {
+        if (closeClientIDs.size === 0) return
+        //节点的链路断了,通知客户端关闭重连
+        closeClientIDs.forEach((id) => {
+            
+            //特定命令协议
+            if(this.conWs[id]) {
+                this.wsClose(id, chain)
+                logger.info('reportClose', chain)
+            }
+        })
+    }
+
     sendUnSubscription(message) {
         if (message.response.params && message.response.params.subscription) {
             if (unSubscription(message.response.method)) {
@@ -216,7 +222,7 @@ class Messengers {
                 let request = this.conWs[id].request
                 let ip = (request.headers['x-forwarded-for'] ? request.headers['x-forwarded-for'].split(/\s*,\s/ [0]) : null) || request.socket.remoteAddress || ''
 
-                publishMessage({
+                kafka.stat({
                     'key': 'request',
                     'message': {
                         protocol: 'websocket',
@@ -237,6 +243,19 @@ class Messengers {
 
         } catch (e) {
             logger.error('Stat Error', e)
+        }
+    }
+
+    changed() {
+        for (let chain in config.messengers) {
+            if (!this.messengers[chain]) {
+                this.messengers[chain] = new Pool(
+                    chain,
+                    config.messengers[chain][0],
+                    (chain, message, index) => this.poolCallback(chain, message, index),
+                    (chain, closeClientIDs) => this.poolCloseCallback(chain, closeClientIDs)
+                )
+            }
         }
     }
 }

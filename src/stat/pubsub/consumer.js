@@ -1,35 +1,69 @@
-const config = global.config = require('../config/index')()
+const config = global.config = require('../config/index')();
 const { logger } = require('../../lib/log')
 const stat = require('../src/api/stat')
-const {PubSub} = require('@google-cloud/pubsub')
+const kafka = require('kafka-node')
+const client = new kafka.KafkaClient({
+    kafkaHost: process.env.KAFKA_HOSTS || config.kafka.hosts,
+    sasl: {
+        mechanism: process.env.KAFKA_SASL_MECHANISM || config.kafka.sasl.mechanism,
+        username: process.env.KAFKA_SASL_USERNAME || config.kafka.sasl.username,
+        password: process.env.KAFKA_SASL_PASSWORD || config.kafka.sasl.password,
+    },
+    sslOptions: {
+        rejectUnauthorized: true
+    }
+})
+const offset = new kafka.Offset(client);
 
-const pubSubClient = new PubSub()
+let option = {
+    kafkaHost: process.env.KAFKA_HOSTS || config.kafka.hosts,
+    sasl: {
+        mechanism: process.env.KAFKA_SASL_MECHANISM || config.kafka.sasl.mechanism,
+        username: process.env.KAFKA_SASL_USERNAME || config.kafka.sasl.username,
+        password: process.env.KAFKA_SASL_PASSWORD || config.kafka.sasl.password,
+    },
+    sslOptions: {
+        rejectUnauthorized: true
+    },
+    groupId: "octopus-gateway-stat",
+    sessionTimeout: 15000,
+    protocol: ['roundrobin'],
+    fromOffset: 'latest',
+    autoCommit: true,
+    autoCommitIntervalMs:1000
+};
+const consumer = new kafka.ConsumerGroup(option, process.env.KAFKA_TOPIC || config.kafka.topic)
 
-function listenForMessages() {
-    const subscriptionName = config.pubsub.subscription
-    const subscription = pubSubClient.subscription(subscriptionName)
+console.log('consumer start')
 
-    subscription.on('message', message => {
-        const msg = JSON.parse(message.data)
-        switch (msg.key) {
+consumer.on('error', function (error) {
+    logger.error('error', error)
+})
+
+consumer.on('offsetOutOfRange', function (topic) {
+    logger.error('offsetOutOfRange', topic)
+    offset.fetch([topic], function (err, offsets) {
+        let min = Math.min.apply(null, offsets[topic.topic][topic.partition])
+        consumer.setOffset(topic.topic, topic.partition, min)
+        logger.info('setOffset', topic.topic, topic.partition, min)
+    })
+})
+
+consumer.on('message', function (message) {
+    try {
+        switch (message.key) {
             case 'request': {
-                stat.request(msg.message)
+                stat.request(JSON.parse(message.value))
             }
             case 'connections': {
                 //统计当前连接数
             }
             default:
-                break
+                break;
         }
-        logger.info(message.data)
+    } catch (e) {
+        logger.error('consumer message error', e)
+    }
 
-        // "Ack" (acknowledge receipt of) the message
-        message.ack()
-    })
-
-    subscription.on('error', error => {
-        logger.error('Received error:', error)
-    })
-}
-
-listenForMessages()
+    logger.info(JSON.stringify(message))
+})

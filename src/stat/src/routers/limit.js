@@ -40,7 +40,12 @@ let checkLimit = async (ctx, next) => {
     return next()
 }
 
-module.exports = {
-    'GET /limit/:chain/:pid([a-z0-9]{32})': checkLimit
+let healthz = async (ctx, next) => {
+    ctx.response.body = JSON.stringify(CODE.SUCCESS)
+    return next()
 }
 
+module.exports = {
+    'GET /limit/:chain/:pid([a-z0-9]{32})': checkLimit,
+    'GET /healthz': healthz
+}

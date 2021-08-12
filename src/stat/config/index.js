@@ -29,6 +29,5 @@ module.exports = function config() {
         throw JSON.stringify({ test: `Load Extend Config Error：./config/extend.json` })
     }
 
-
     return config
 }

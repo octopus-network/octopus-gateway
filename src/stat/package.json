@@ -1,9 +1,9 @@
 {
   "dependencies": {
-    "@google-cloud/pubsub": "^2.16.1",
     "commander": "^6.2.0",
     "extend": "^3.0.2",
     "ioredis": "^4.17.3",
+    "kafka-node": "^5.0.0",
     "koa": "^2.13.0",
     "koa-body": "^4.2.0",
     "koa-log4": "^2.3.2",

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "etcd3": "^1.1.0",
     "ioredis": "^4.19.4",
     "koa-log4": "^2.3.2"
   }

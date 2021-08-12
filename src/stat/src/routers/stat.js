@@ -61,7 +61,7 @@ let requestsOfPeriod = async (ctx, next) => {
     return next()
 }
 
-let dashboard=async (ctx, next) => {
+let dashboard = async (ctx, next) => {
     ctx.response.body = (new Result(0, '', await Stat.dashboard())).toString()
     return next()
 }
