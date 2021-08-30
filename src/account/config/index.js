@@ -10,7 +10,7 @@ module.exports = function config() {
     // 默认开发环境
     const env = process.env.NODE_ENV || 'dev'
 
-    console.log('Current NODE_ENV', env)
+    console.log('Current NODE_ENV'　,env)
 
     const config = {}
 
@@ -28,6 +28,7 @@ module.exports = function config() {
     } catch (err) {
         throw JSON.stringify({ text: `Load Extend Config Error：./config/extend.json` })
     }
+
 
     return config
 }
