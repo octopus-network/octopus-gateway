@@ -75,15 +75,24 @@ process.on('uncaughtException', function (e) {
 logger.info(config.name, ' started listen on ', config.port)
 
 
-// watch etcd config
+// watch remote config
 const extend = require('extend')
-const etcdConfig = require('./config/etcd')
-etcdConfig(data => {
+
+// -- etcd --
+// const etcdConfig = require('./config/remote/etcd')
+// etcdConfig(data => {
+//     extend(config, JSON.parse(data))
+//     console.log('changed', config)
+// }).then(data => {
+//     extend(config, JSON.parse(data))
+//     console.log('loaded', config)
+// }).catch(err => {
+//     throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+// })
+
+// -- firestore --
+const firestoreConfig = require('./config/remote/firestore')
+firestoreConfig(data => {
     extend(config, JSON.parse(data))
-    console.log('changed', config)
-}).then(data => {
-    extend(config, JSON.parse(data))
-    console.log('loaded', config)
-}).catch(err => {
-    throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+    console.log('config:', config)
 })

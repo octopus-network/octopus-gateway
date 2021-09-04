@@ -73,28 +73,51 @@ process.on('uncaughtException', function (e) {
 logger.info(config.name, ' started listen on ', config.port)
 
 
-// watch etcd config
-const path = require('path');
+// watch remote config
+const path = require('path')
 const extend = require('extend')
-const etcdConfig = require('./config/etcd')
-etcdConfig((key, val) => {
-    if (key.endsWith('config.json')) {
-        extend(true, config, JSON.parse(val))
-        console.log('changed', config)
-        router.changed()
-    } else {
-        const chain = path.basename(key, '.json')
-        if (!config.chain[chain]) {
-            config.chain[chain] = {}
-        }
-        extend(true, config.chain[chain], JSON.parse(val))
-        console.log('changed', config)
-    }
-}).then(data => {
+
+// -- etcd --
+// const etcdConfig = require('./config/remote/etcd')
+// etcdConfig((key, val) => {
+//     if (key.endsWith('config.json')) {
+//         extend(true, config, JSON.parse(val))
+//         console.log('changed', config)
+//         router.changed()
+//     } else {
+//         const chain = path.basename(key, '.json')
+//         if (!config.chain[chain]) {
+//             config.chain[chain] = {}
+//         }
+//         extend(true, config.chain[chain], JSON.parse(val))
+//         console.log('changed', config)
+//     }
+// }).then(data => {
+//     for (const key in data) {
+//         if (key.endsWith('config.json')) {
+//             extend(true, config, JSON.parse(data[key]))
+//         } else {
+//             const chain = path.basename(key, '.json')
+//             if (!config.chain[chain]) {
+//                 config.chain[chain] = {}
+//             }
+//             extend(true, config.chain[chain], JSON.parse(data[key]))
+//         }
+//     }
+//     console.log('loaded', config)
+//     router.changed()
+// }).catch(err => {
+//     throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
+// })
+
+// -- firestore --
+const firestoreConfig = require('./config/remote/firestore')
+firestoreConfig(data => {
     for (const key in data) {
-        if (key.endsWith('config.json')) {
+        if (key == 'config.json') {
             extend(true, config, JSON.parse(data[key]))
-        } else {
+        }
+        else {
             const chain = path.basename(key, '.json')
             if (!config.chain[chain]) {
                 config.chain[chain] = {}
@@ -102,8 +125,6 @@ etcdConfig((key, val) => {
             extend(true, config.chain[chain], JSON.parse(data[key]))
         }
     }
-    console.log('loaded', config)
+    console.log('config:', config)
     router.changed()
-}).catch(err => {
-    throw JSON.stringify({ text: `Load Etcd Config Error：${err}` })
 })

@@ -1,4 +1,4 @@
-const etcd = require("../../lib/etcd")
+const etcd = require("../../../lib/etcd")
 
 const prefix = 'octopus/gateway/messenger/'
 // const key = 'octopus/gateway/messenger/config.json'

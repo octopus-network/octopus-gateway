@@ -1,4 +1,4 @@
-const etcd = require("../../lib/etcd")
+const etcd = require("../../../lib/etcd")
 
 const key = 'octopus/gateway/api/config.json'
 
