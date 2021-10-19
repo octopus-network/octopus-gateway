@@ -1,47 +1,29 @@
-
-
 steps:
-# api
 - name: 'gcr.io/cloud-builders/docker'
   args: 
   - build
   - -t
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
   - -f
   - Dockerfile.api
   - .
 - name: 'gcr.io/cloud-builders/docker'
-  args:
-  - push
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
-# messenger
-- name: 'gcr.io/cloud-builders/docker'
   args: 
   - build
   - -t
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-messenger
   - -f
   - Dockerfile.messenger
   - .
 - name: 'gcr.io/cloud-builders/docker'
-  args:
-  - push
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
-# stat
-- name: 'gcr.io/cloud-builders/docker'
   args: 
   - build
   - -t
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-stat
   - -f
   - Dockerfile.stat
   - .
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-  - push
-  - gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
-
 images:
-- gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-api:$SHORT_SHA
-- gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-messenger:$SHORT_SHA
-- gcr.io/$PROJECT_ID/$REPO_NAME/octopus-gateway-stat:$SHORT_SHA
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-messenger
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-stat
