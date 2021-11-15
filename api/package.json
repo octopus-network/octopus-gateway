@@ -1,7 +1,7 @@
 {
   "dependencies": {
-    "@polkadot/api": "^2.10.1",
-    "@polkadot/rpc-core": "^2.1.1",
+    "@polkadot/api": "^6.8.1",
+    "@polkadot/rpc-core": "^6.8.1",
     "async-redis": "^1.1.7",
     "crypto": "^1.0.1",
     "extend": "^3.0.2",
@@ -16,7 +16,7 @@
     "koa-router": "^9.4.0",
     "koa-session": "^6.0.0",
     "koa-session2": "^2.2.10",
-    "koa-socket-2": "^1.2.0",
+    "koa-socket-2": "^2.0.0",
     "koa-static": "^5.0.0",
     "passport": "^0.4.1",
     "passport-github": "^1.1.0",
