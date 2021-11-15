@@ -34,26 +34,6 @@ class Node {
                         this.router.callback(id, chain, message)
                     } else {
                         // patch: 订阅消息先于订阅id返回
-                        let remove = []
-                        for (const [idx, val] of this.cache.entries()) {
-                            let subscription_id = val.message.params.subscription
-                            if (this.subscription_msg[subscription_id]) {
-                                const {
-                                    id,
-                                    chain
-                                } = this.subscription_msg[subscription_id]
-                                this.router.callback(id, chain, val.message)
-                                remove.push(idx)
-                            } else {
-                                this.cache[idx].count += 1
-                                if (this.cache[idx].count > 5) {
-                                    remove.push(idx)
-                                }
-                            }
-                        }
-                        this.cache = this.cache.filter((_, index) => {
-                            return remove.indexOf(index) == -1;
-                        })
                         this.cache.push({
                             count: 0,
                             message
@@ -71,6 +51,27 @@ class Node {
                         this.router.callback(id, chain, message)
                         if (message.result && isSubscription(chain, request)) {
                             this.subscription_msg[message.result] = this.replacement_msg[replacement_id]
+                            // patch: 订阅消息先于订阅id返回
+                            let remove = []
+                            for (const [idx, val] of this.cache.entries()) {
+                                let subscription_id = val.message.params.subscription
+                                if (this.subscription_msg[subscription_id]) {
+                                    const {
+                                        id,
+                                        chain
+                                    } = this.subscription_msg[subscription_id]
+                                    this.router.callback(id, chain, val.message)
+                                    remove.push(idx)
+                                } else {
+                                    this.cache[idx].count += 1
+                                    if (this.cache[idx].count > 5) {
+                                        remove.push(idx)
+                                    }
+                                }
+                            }
+                            this.cache = this.cache.filter((_, index) => {
+                                return remove.indexOf(index) == -1;
+                            })
                         }
                     }
                     delete this.replacement_msg[replacement_id]
