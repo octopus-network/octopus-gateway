@@ -36,6 +36,7 @@
             "key": [
                 "chain_subscribeNewHeads",
                 "chain_subscribeFinalizedHeads",
+                "beefy_subscribeJustifications",
                 "state_subscribeRuntimeVersion",
                 "state_subscribeStorage"
             ]
