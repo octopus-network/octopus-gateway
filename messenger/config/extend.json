@@ -3,13 +3,10 @@
         "author_submitAndWatchExtrinsic",
         "chain_subscribeAllHeads",
         "chain_subscribeNewHeads",
-        "chain_subscribeNewHead",
-        "subscribe_newHead",
         "chain_subscribeFinalizedHeads",
-        "chain_subscribeFinalisedHeads",
         "beefy_subscribeJustifications",
+        "grandpa_subscribeJustifications",
         "state_subscribeRuntimeVersion",
-        "chain_subscribeRuntimeVersion",
         "state_subscribeStorage"
     ],
     "un-subscription": {
@@ -18,6 +15,7 @@
         "chain_newHead": "chain_unsubscribeNewHeads",
         "chain_finalizedHead": "chain_unsubscribeFinalizedHeads",
         "beefy_justifications": "beefy_unsubscribeJustifications",
+        "grandpa_justifications": "grandpa_unsubscribeJustifications",
         "state_runtimeVersion": "state_unsubscribeRuntimeVersion",
         "state_storage": "state_unsubscribeStorage"
     },
