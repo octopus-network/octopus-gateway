@@ -177,17 +177,14 @@ class Messengers {
     }
 
     wsClose(id, chain) {
-        const subIds = []
         for (let method in this.conWs[id].unsubscription_msg) {
-            subIds.push(...this.conWs[id].unsubscription_msg[method])
-        }
-        if( subIds.length > 0 ) {
+            let subIds = [...this.conWs[id].unsubscription_msg[method]]
             this.messengers[chain].send({
                 "id": id,
                 "chain": chain,
                 "request": {
                     "jsonrpc": '2.0',
-                    "method": 'state_unsubscribeStorage',
+                    "method": method,
                     "params": subIds,
                     "id": 1
                 }

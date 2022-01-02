@@ -2,18 +2,23 @@
     "subscription": [
         "author_submitAndWatchExtrinsic",
         "chain_subscribeAllHeads",
+        "chain_subscribeNewHead",
         "chain_subscribeNewHeads",
+        "chain_subscribeFinalisedHeads",
         "chain_subscribeFinalizedHeads",
+        "chain_subscribeRuntimeVersion",
         "beefy_subscribeJustifications",
         "grandpa_subscribeJustifications",
         "state_subscribeRuntimeVersion",
-        "state_subscribeStorage"
+        "state_subscribeStorage",
+        "subscribe_newHead"
     ],
     "un-subscription": {
         "author_extrinsicUpdate": "author_unwatchExtrinsic",
         "chain_allHead": "chain_unsubscribeAllHeads",
         "chain_newHead": "chain_unsubscribeNewHeads",
         "chain_finalizedHead": "chain_unsubscribeFinalizedHeads",
+        "chain_runtimeVersion": "chain_unsubscribeRuntimeVersion",
         "beefy_justifications": "beefy_unsubscribeJustifications",
         "grandpa_justifications": "grandpa_unsubscribeJustifications",
         "state_runtimeVersion": "state_unsubscribeRuntimeVersion",

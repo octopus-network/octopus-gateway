@@ -10,14 +10,14 @@ module.exports = function config() {
     try {
         extend(config, require(envPath))
     } catch (err) {
-        throw JSON.stringify({ text: `Load ${env} Config Error：${envPath}` })
+        throw JSON.stringify({ text: `Load ${env} Config Error: ${envPath}` })
     }
 
     try {
         extend(true, config, require(path.resolve(__dirname + '/extend.json')))
     } catch (err) {
         console.log(err)
-        throw JSON.stringify({ text: 'Load Extend Config Error：'+__dirname+'/extend.json' })
+        throw JSON.stringify({ text: 'Load Extend Config Error: '+__dirname+'/extend.json' })
     }
 
     if (config.chain) {
