@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// const rateLimitPath = "/limit"
+const healthCheckPath = "/health"
+
 type (
 	Proxy struct {
 		rpc *HttpProxy
@@ -17,11 +20,11 @@ type (
 	}
 
 	Router struct {
-		routes  map[string]*Proxy
-		limiter string
+		routes       map[string]*Proxy
+		routeChecker string
 	}
 
-	Limiter struct {
+	RouteResponse struct {
 		Route  bool `json:"route"`
 		Target struct {
 			RPC string `json:"rpc"`
@@ -30,37 +33,48 @@ type (
 	}
 )
 
-func NewRouter(limiter string) *Router {
+func NewRouter(routeChecker string) *Router {
 	return &Router{
-		limiter: limiter,
-		routes:  map[string]*Proxy{},
+		routeChecker: routeChecker,
+		routes:       map[string]*Proxy{},
 	}
 }
 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	// Health Check
+	if req.URL.Path == healthCheckPath {
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.WriteHeader(http.StatusOK)
+		rw.Write([]byte("OK"))
+		return
+	}
+
 	// Using regexp extract path. /myriad/sbbdluuarbc524e9h3zd2fu4macyl306
 	re := regexp.MustCompile(`^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`)
 	params := re.FindStringSubmatch(req.URL.Path)
 	if len(params) < 3 {
 		log.Println("[400] Bad Request", req.URL.Path)
-		rw.WriteHeader(400)
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.WriteHeader(http.StatusBadRequest)
 		rw.Write([]byte("Bad Request"))
 		return
 	}
 	chain, project := params[1], params[2]
 
 	// Check if the request should be routed
-	limiter := Limiter{}
-	if err := r.shouldRoute(chain, project, &limiter); err != nil {
+	routeResp := RouteResponse{}
+	if err := r.shouldRoute(chain, project, &routeResp); err != nil {
 		log.Println("[500] Internal Server Error", err)
-		rw.WriteHeader(500)
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte("Internal Server Error"))
 		return
 	}
 
-	if !limiter.Route {
+	if !routeResp.Route {
 		log.Println("[403] Forbidden", req.URL.Path)
-		rw.WriteHeader(403)
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.WriteHeader(http.StatusForbidden)
 		rw.Write([]byte("Forbidden"))
 		return
 	}
@@ -68,11 +82,12 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Create proxy if it does not exist
 	proxy, found := r.routes[chain]
 	if !found {
-		proxy = r.addRoute(chain, limiter.Target.RPC, limiter.Target.WS)
+		proxy = r.addRoute(chain, routeResp.Target.RPC, routeResp.Target.WS)
 	}
 	if proxy == nil {
 		log.Println("[404] Not Found", req.URL.Path)
-		rw.WriteHeader(404)
+		rw.Header().Set("Content-Type", "text/plain")
+		rw.WriteHeader(http.StatusNotFound)
 		rw.Write([]byte("Not Found"))
 		return
 	}
@@ -112,7 +127,7 @@ func (r *Router) addRoute(chain string, rpc string, ws string) *Proxy {
 
 func (r *Router) shouldRoute(chain, project string, target interface{}) error {
 	client := &http.Client{Timeout: 1 * time.Second}
-	url := fmt.Sprintf("%s?chain=%s&project=%s", r.limiter, chain, project)
+	url := fmt.Sprintf("%s/%s/%s", r.routeChecker, chain, project)
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
