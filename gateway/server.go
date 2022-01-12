@@ -13,7 +13,7 @@ func main() {
 		routeChecker = value
 	}
 
-	err := http.ListenAndServe(":8888", NewRouter(routeChecker))
+	err := http.ListenAndServe(":80", NewRouter(routeChecker))
 	if err != nil {
 		log.Fatalln(err)
 	}
