@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sync"
 	"time"
 )
 
@@ -20,7 +21,7 @@ type (
 	}
 
 	Router struct {
-		routes       map[string]*Proxy
+		routes       sync.Map
 		routeChecker string
 	}
 
@@ -36,7 +37,6 @@ type (
 func NewRouter(routeChecker string) *Router {
 	return &Router{
 		routeChecker: routeChecker,
-		routes:       map[string]*Proxy{},
 	}
 }
 
@@ -73,15 +73,16 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Create proxy if it does not exist
-	proxy, found := r.routes[chain]
-	if !found {
-		proxy = r.addRoute(chain, routeResp.Target.RPC, routeResp.Target.WS)
+	value, ok := r.routes.Load(chain)
+	if !ok {
+		value = r.addRoute(chain, routeResp.Target.RPC, routeResp.Target.WS)
 	}
-	if proxy == nil {
+	if value == nil {
 		log.Println(fmt.Sprintf("[%d] %s", http.StatusNotFound, req.URL.Path))
 		http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
+	proxy := value.(*Proxy)
 
 	// Route request
 	switch req.URL.Scheme {
@@ -105,7 +106,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) addRoute(chain string, rpc string, ws string) *Proxy {
+func (r *Router) addRoute(chain string, rpc string, ws string) interface{} {
 	u1, _ := url.Parse(rpc)
 	u2, _ := url.Parse(ws)
 	if u1 == nil || u2 == nil {
@@ -113,8 +114,8 @@ func (r *Router) addRoute(chain string, rpc string, ws string) *Proxy {
 	}
 
 	proxy := &Proxy{rpc: NewHttpProxy(u1), ws: NewWebsocketProxy(u2)}
-	r.routes[chain] = proxy
-	return proxy
+	actual, _ := r.routes.LoadOrStore(chain, proxy)
+	return actual
 }
 
 func (r *Router) shouldRoute(chain, project string, target interface{}) error {
