@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgconn"
 	"github.com/jmoiron/sqlx"
 )
@@ -54,13 +55,15 @@ func NewResponse(code int, data interface{}, err error) *Response {
 type Handler struct {
 	db       *sqlx.DB
 	validate *validator.Validate
-	// TODO: lru/redis cache
+	cache    *lru.Cache
 }
 
 func NewHandler(db *sqlx.DB) *Handler {
+	cache, _ := lru.New(128)
 	return &Handler{
 		db:       db,
 		validate: validator.New(),
+		cache:    cache,
 	}
 }
 
@@ -169,6 +172,12 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if val, ok := h.cache.Get(r.URL.Path); ok {
+		route := val.(*Route)
+		render.Respond(w, r, route)
+		return
+	}
+
 	chain := Chain{}
 	stmt := "SELECT chains.* FROM projects JOIN chains ON chains.id=projects.chain WHERE projects.id=$1 AND chains.id=$2"
 	if err := h.db.Get(&chain, stmt, projectID, chainID); err != nil {
@@ -186,6 +195,7 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 			WS:  chain.WS,
 		},
 	}
+	h.cache.Add(r.URL.Path, &route)
 	render.Respond(w, r, route)
 }
 

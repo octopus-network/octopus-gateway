@@ -6,7 +6,8 @@ require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/render v1.0.1
 	github.com/go-playground/validator/v10 v10.10.0
-	github.com/jackc/pgconn v1.10.1 
+	github.com/hashicorp/golang-lru v0.5.4
+	github.com/jackc/pgconn v1.10.1
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/spf13/viper v1.10.1
