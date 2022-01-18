@@ -1,48 +1,47 @@
 package main
 
 import (
-	"log"
+	"encoding/json"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 )
 
+type JsonRpcRequest struct {
+	Id     uint64      `json:"id"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+}
+
+type JsonRpcResponse struct {
+	Id     uint64           `json:"id"`
+	Result *json.RawMessage `json:"result"`
+	Error  interface{}      `json:"error"`
+}
+
+type ProxyTransport struct {
+	http.RoundTripper
+}
+
 type HttpProxy struct {
-	// Backend returns the backend URL which the proxy uses to reverse proxy
-	// the incoming HTTP connection. Request is the initial incoming and
-	// unmodified request.
-	Backend func(*http.Request) *url.URL
+	// ReverseProxy is an HTTP Handler that takes an incoming request and
+	// sends it to another server, proxying the response back to the
+	// client.
+	Proxy *httputil.ReverseProxy
 }
 
 func NewHttpProxy(target *url.URL) *HttpProxy {
-	backend := func(r *http.Request) *url.URL {
-		u := *target
-		return &u
-	}
-	return &HttpProxy{Backend: backend}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	// proxy.Director = func(r *http.Request) {}
+	proxy.Transport = &ProxyTransport{http.DefaultTransport}
+	return &HttpProxy{Proxy: proxy}
 }
 
 func (h *HttpProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if h.Backend == nil {
-		log.Println("websocketproxy: backend function is not defined")
-		http.Error(rw, "internal server error (code: 1)", http.StatusInternalServerError)
-		return
-	}
+	h.Proxy.ServeHTTP(rw, req)
+}
 
-	backendURL := h.Backend(req)
-	if backendURL == nil {
-		log.Println("websocketproxy: backend URL is nil")
-		http.Error(rw, "internal server error (code: 2)", http.StatusInternalServerError)
-		return
-	}
-
-	// Create the reverse proxy
-	proxy := httputil.NewSingleHostReverseProxy(backendURL)
-	// Update the headers to allow for SSL redirection
-	// req.URL.Host = url.Host
-	// req.URL.Scheme = url.Scheme
-	// req.Host = url.Host
-
-	// Note that ServeHttp is non blocking and uses a go routine under the hood
-	proxy.ServeHTTP(rw, req)
+func (t *ProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// TODO: usage statistics
+	return t.RoundTripper.RoundTrip(req)
 }
