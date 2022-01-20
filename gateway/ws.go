@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/xid"
 )
 
 var (
@@ -197,16 +198,14 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	uuid := xid.New().String()
+	addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
+	path := req.URL.Path
 	logRequest := func(data []byte) error {
-		addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
-		path := req.URL.Path
-		return dumpJsonRpcRequest(addr, path, data, true)
+		return dumpJsonRpcRequest(uuid, addr, path, data, true)
 	}
-
 	logResponse := func(data []byte) error {
-		addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
-		path := req.URL.Path
-		return dumpJsonRpcResponse(addr, path, data, true)
+		return dumpJsonRpcResponse(uuid, addr, path, data, true)
 	}
 
 	go replicateWebsocketConn(connPub, connBackend, errClient, logResponse)
