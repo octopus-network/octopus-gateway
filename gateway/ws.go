@@ -69,7 +69,6 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	backendURL := w.Backend(req)
-	fmt.Println(backendURL)
 	if backendURL == nil {
 		log.Println("websocketproxy: backend URL is nil")
 		http.Error(rw, "internal server error (code: 2)", http.StatusInternalServerError)
@@ -173,7 +172,7 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	errClient := make(chan error, 1)
 	errBackend := make(chan error, 1)
-	replicateWebsocketConn := func(dst, src *websocket.Conn, errc chan error) {
+	replicateWebsocketConn := func(dst, src *websocket.Conn, errc chan error, logger func(data []byte) error) {
 		for {
 			msgType, msg, err := src.ReadMessage()
 			if err != nil {
@@ -192,11 +191,26 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				errc <- err
 				break
 			}
+
+			// Log request/response
+			logger(msg)
 		}
 	}
 
-	go replicateWebsocketConn(connPub, connBackend, errClient)
-	go replicateWebsocketConn(connBackend, connPub, errBackend)
+	logRequest := func(data []byte) error {
+		addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
+		path := req.URL.Path
+		return dumpJsonRpcRequest(addr, path, data, true)
+	}
+
+	logResponse := func(data []byte) error {
+		addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
+		path := req.URL.Path
+		return dumpJsonRpcResponse(addr, path, data, true)
+	}
+
+	go replicateWebsocketConn(connPub, connBackend, errClient, logResponse)
+	go replicateWebsocketConn(connBackend, connPub, errBackend, logRequest)
 
 	var message string
 	select {

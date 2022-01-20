@@ -7,6 +7,8 @@ import (
 )
 
 func main() {
+	InitLogger()
+
 	// Route URL: http://gateway-api/route/{chain_id}/{project_id}
 	routeChecker := "http://gateway-api/route"
 	if value, ok := os.LookupEnv("GATEWAY_API_ROUTE_URL"); ok {
