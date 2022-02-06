@@ -1,6 +1,13 @@
 package main
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyz"
 

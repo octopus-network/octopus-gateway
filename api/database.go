@@ -16,6 +16,7 @@ func NewSqlx(cfg *Config) *sqlx.DB {
 		cfg.Database.Database,
 		cfg.Database.SslMode)
 	db, err := sqlx.Connect(cfg.Database.Driver, dsn)
+	// TODO: retry
 	if err != nil {
 		panic(err)
 	}

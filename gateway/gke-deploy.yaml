@@ -1,0 +1,167 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: gateway
+  name: octopus-gateway-router-configmap
+data:
+  GATEWAY_API_ROUTE_URL: http://octopus-gateway-api/route
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: gateway
+  name: octopus-gateway-router-secret
+stringData:
+  fluentd.conf: |-
+    <source>
+        @type tail
+        @label @GATEWAY
+        path /var/log/gateway/gateway*.log
+        pos_file /fluentd/log/gateway.log.pos
+        tag gateway.**
+        read_from_head true
+        follow_inodes true
+        <parse>
+            @type json
+        </parse>
+    </source>
+
+    <label @GATEWAY>
+        <filter gateway.**>
+            @type grep
+            <regexp>
+                key msg
+                pattern /^(request|response|subscription)$/
+            </regexp>
+        </filter>
+
+        <match gateway.**>
+            @type kafka2
+            brokers <brokers>
+            default_topic <topic>
+            partition_key_key path
+            use_event_time true
+            get_kafka_client_log true
+            # max_send_limit_bytes 1000000
+            
+            ssl_ca_certs_from_system true
+            sasl_over_ssl true
+            username <username>
+            password <password>
+            
+            <format>
+                @type json
+            </format>
+            # https://docs.fluentd.org/configuration/buffer-section
+            <buffer octopus_gateway>
+                flush_mode immediate
+            </buffer>
+        </match>
+    </label>
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: gateway
+  name: octopus-gateway-router
+  labels:
+    app: octopus-gateway-router
+spec:
+  selector:
+    matchLabels:
+      app: octopus-gateway-router
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: octopus-gateway-router
+    spec:
+      containers:
+      - name: router
+        image: asia-northeast1-docker.pkg.dev/bigdata-329111/octopus/octopus-gateway-router@sha256:45e10412651d3bc336739cfd110a028002f904b8ea89145262a0257310f28129
+        ports:
+        - containerPort: 80
+        env:
+        - name: GATEWAY_API_ROUTE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: octopus-gateway-router-configmap
+              key: GATEWAY_API_ROUTE_URL
+        volumeMounts:
+        - name: router-log
+          mountPath: /octopus-gateway/logs
+      - name: fluentd
+        image: asia-northeast1-docker.pkg.dev/bigdata-329111/octopus/octopus-gateway-fluentd@sha256:d580b7c7ff52ce5b81b44937de297111d6f5a0bcd49aaacc5529f040e3fbeec7
+        volumeMounts:
+        - name: router-secret-volume
+          mountPath: /fluentd/etc/fluent.conf
+          subPath: fluentd.conf
+        - name: router-log
+          mountPath: /var/log/gateway
+      volumes:
+      - name: router-log
+        emptyDir: {}
+      - name: router-secret-volume
+        secret:
+          secretName: octopus-gateway-router-secret
+
+---
+# backendconfig: healthcheck(/health) & websocket timeout(3600s)
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  namespace: gateway
+  name: octopus-gateway-router-backendconfig
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /health
+    port: 80
+  timeoutSec: 3600
+  connectionDraining:
+    drainingTimeoutSec: 3600
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: gateway
+  name: octopus-gateway-router
+  labels:
+    app: octopus-gateway-router
+  annotations:
+    cloud.google.com/backend-config: '{"default": "octopus-gateway-router-backendconfig"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: octopus-gateway-router
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: gateway
+  name: octopus-gateway-ingress
+spec:
+  defaultBackend:
+    service:
+      name: octopus-gateway-router
+      port:
+        number: 80
+  # rules:
+  # - http:
+  #     paths:
+  #     - path: /
+  #       pathType: ImplementationSpecific
+  #       backend:
+  #         service:
+  #           name: octopus-gateway-router
+  #           port:
+  #             number: 80

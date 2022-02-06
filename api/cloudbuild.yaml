@@ -1,0 +1,19 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - build
+  - -t
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
+  - -f
+  - Dockerfile
+  - .
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - push
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
+
+images:
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
+
+
+# gcloud builds submit --config=cloudbuild.yaml --substitutions=REPO_NAME="octopus-gateway"
