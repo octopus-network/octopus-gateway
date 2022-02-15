@@ -34,7 +34,7 @@ variable "gateway_api" {
 variable "gateway_router" {
   description = "Gateway Router Configuration"
   type        = object({
-    domains       = list(string)
+    dns_zone      = string
     replicas      = number
     router_image  = string
     fluentd_image = string

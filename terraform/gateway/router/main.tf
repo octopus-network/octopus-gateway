@@ -65,19 +65,19 @@ resource "kubernetes_deployment" "default" {
             mount_path = "/octopus-gateway/logs"
           }
         }
-        container {
-          name  = "fluentd"
-          image = var.gateway_router.fluentd_image
-          volume_mount {
-            name       = "router-log-volume"
-            mount_path = "/var/log/gateway"
-          }
-          volume_mount {
-            name       = "router-secret-volume"
-            mount_path = "/fluentd/etc/fluent.conf"
-            sub_path   = "fluentd.conf"
-          }
-        }
+        # container {
+        #   name  = "fluentd"
+        #   image = var.gateway_router.fluentd_image
+        #   volume_mount {
+        #     name       = "router-log-volume"
+        #     mount_path = "/var/log/gateway"
+        #   }
+        #   volume_mount {
+        #     name       = "router-secret-volume"
+        #     mount_path = "/fluentd/etc/fluent.conf"
+        #     sub_path   = "fluentd.conf"
+        #   }
+        # }
         volume {
           name = "router-log-volume"
           empty_dir {
@@ -130,7 +130,7 @@ resource "kubernetes_service" "default" {
     }
   }
   spec {
-    type = "ClusterIP"
+    type = "NodePort"
     selector = {
       name = "octopus-gateway-router"
       app  = "octopus-gateway"
@@ -147,10 +147,37 @@ resource "google_compute_global_address" "default" {
   name = "octopus-gateway-global-address"
 }
 
-resource "google_compute_managed_ssl_certificate" "default" {
-  name = "octopus-gateway-certificate"
-  managed {
-    domains = var.gateway_router.domains
+data "google_dns_managed_zone" "default" {
+  name = var.gateway_router.dns_zone
+}
+
+resource "google_dns_record_set" "a" {
+  name         = "gateway.${data.google_dns_managed_zone.default.dns_name}"
+  managed_zone = data.google_dns_managed_zone.default.name
+  type         = "A"
+  ttl          = 300
+  rrdatas = [google_compute_global_address.default.address]
+}
+
+resource "google_dns_record_set" "caa" {
+  name         = "gateway.${data.google_dns_managed_zone.default.dns_name}"
+  managed_zone = data.google_dns_managed_zone.default.name
+  type         = "CAA"
+  ttl          = 300
+  rrdatas = ["0 issue \"pki.goog\""]
+}
+
+resource "kubernetes_manifest" "certificate" {
+  manifest = {
+    apiVersion = "networking.gke.io/v1"
+    kind       = "ManagedCertificate"
+    metadata   = {
+      name      = "octopus-gateway-managed-certificate"
+      namespace = var.namespace
+    }
+    spec = {
+      domains = [trimsuffix(google_dns_record_set.a.name, ".")]
+    }
   }
 }
 
@@ -160,7 +187,8 @@ resource "kubernetes_ingress" "default" {
     namespace   = var.namespace
     annotations = {
       "kubernetes.io/ingress.global-static-ip-name" = google_compute_global_address.default.name
-      "networking.gke.io/managed-certificates"      = google_compute_managed_ssl_certificate.default.name
+      "networking.gke.io/managed-certificates"      = "octopus-gateway-managed-certificate"
+      "kubernetes.io/ingress.class"                 = "gce"
     }
   }
   spec {
