@@ -20,12 +20,18 @@ provider "kubernetes" {
 module "fullnode" {
   source = "./node"
 
-  for_each      = var.chains
-  chain_name    = each.key
-  chain_spec    = each.value.chain_spec
-  base_image    = each.value.image
-  start_cmd     = each.value.command
-  replicas      = each.value.replicas
-  telemetry_url = each.value.telemetry_url
+  for_each        = var.chains
+  chain_name      = each.key
+  chain_spec      = each.value.chain_spec
+  base_image      = each.value.image
+  start_cmd       = each.value.command
+  replicas        = each.value.replicas
+  telemetry_url   = each.value.telemetry_url
+  cpu_requests    = each.value.resources.cpu_requests
+  cpu_limits      = each.value.resources.cpu_limits
+  memory_requests = each.value.resources.memory_requests
+  memory_limits   = each.value.resources.memory_limits
+  volume_type     = each.value.resources.volume_type
+  volume_size     = each.value.resources.volume_size
   namespace     = var.namespace
 }
