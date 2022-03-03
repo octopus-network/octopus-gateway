@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/xid"
@@ -26,7 +27,14 @@ var (
 	}
 
 	// DefaultDialer is a dialer with all fields set to the default zero values.
-	DefaultDialer = websocket.DefaultDialer
+	// DefaultDialer = websocket.DefaultDialer
+	DefaultDialer = &websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 45 * time.Second,
+
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024 * 256,
+	}
 )
 
 // WebsocketProxy is an HTTP Handler that takes an incoming WebSocket
@@ -84,6 +92,9 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Pass headers from the incoming request to the dialer to forward them to
 	// the final destinations.
 	requestHeader := http.Header{}
+	if origin := req.Header.Get("User-Agent"); origin != "" {
+		requestHeader.Add("User-Agent", origin)
+	}
 	if origin := req.Header.Get("Origin"); origin != "" {
 		requestHeader.Add("Origin", origin)
 	}
@@ -146,6 +157,7 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
+	connBackend.EnableWriteCompression(false)
 	defer connBackend.Close()
 
 	upgrader := w.Upgrader

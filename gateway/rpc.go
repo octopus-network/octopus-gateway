@@ -121,7 +121,7 @@ func dumpJsonRpcRequest(uuid, addr, path string, data []byte, body bool) error {
 
 	id := jsonMap["id"]
 	method := jsonMap["method"]
-	params := jsonMap["params"]
+	// params := jsonMap["params"]
 	if id == nil || method == nil {
 		return errors.New("jsonrpc: invalid id/method field in decoded object")
 	}
@@ -131,8 +131,8 @@ func dumpJsonRpcRequest(uuid, addr, path string, data []byte, body bool) error {
 		"remote", addr,
 		"path", path,
 		"id", id,
-		"method", method,
-		"params", params)
+		"method", method)
+	// "params", params)
 	return nil
 }
 
