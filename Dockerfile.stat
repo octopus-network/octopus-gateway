@@ -1,0 +1,11 @@
+FROM node:16.6.1-buster-slim
+
+WORKDIR /app
+
+COPY ./lib ./lib
+RUN cd /app/lib && npm install --only=production
+
+COPY ./stat ./stat
+RUN cd /app/stat && npm install --only=production
+
+CMD ["node", "stat/app.js"]
