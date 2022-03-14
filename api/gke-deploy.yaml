@@ -1,0 +1,84 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: gateway
+  name: octopus-gateway-api-secret
+stringData:
+  config.yaml: |-
+    Api:
+      Host: 0.0.0.0
+      Port: 80
+      GracefulTimeout: 10s
+
+    Database:
+      Driver: pgx
+      Host: 127.0.0.1
+      Port: 5432
+      Database: <database>
+      User: <username>
+      Password: <password>
+      SslMode: disable
+      MaxConnectionPool: 10
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: gateway
+  name: octopus-gateway-api
+  labels:
+    app: octopus-gateway-api
+spec:
+  selector:
+    matchLabels:
+      app: octopus-gateway-api
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: octopus-gateway-api
+    spec:
+      containers:
+      - name: api
+        image: asia-northeast1-docker.pkg.dev/bigdata-329111/octopus/octopus-gateway-api@sha256:f84d8014a4dda18fdfd663db778cca1bafe31d3ecdba6c52e1e0eaaf850dcf6e
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - name: api-secret-volume
+            mountPath: /octopus-gateway/config.yaml
+            subPath: config.yaml
+            readOnly: true
+      - name: proxy
+        image: gcr.io/cloudsql-docker/gce-proxy:1.28.1
+        command:
+          - "/cloud_sql_proxy"
+          - "-instances=bigdata-329111:asia-northeast1:octopus=tcp:5432"
+        securityContext:
+          runAsNonRoot: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+      volumes:
+        - name: api-secret-volume
+          secret:
+            secretName: octopus-gateway-api-secret
+      serviceAccountName: gateway-ksa
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: gateway
+  name: octopus-gateway-api
+  labels:
+    app: octopus-gateway-api
+spec:
+  type: ClusterIP
+  selector:
+    app: octopus-gateway-api
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP

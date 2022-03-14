@@ -11,19 +11,19 @@ steps:
   args: 
   - build
   - -t
-  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-messenger
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-router
   - -f
-  - Dockerfile.messenger
+  - Dockerfile.gateway
   - .
 - name: 'gcr.io/cloud-builders/docker'
   args: 
   - build
   - -t
-  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-stat
+  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-fluentd
   - -f
-  - Dockerfile.stat
+  - Dockerfile.kafka
   - .
 images:
 - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-api
-- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-messenger
-- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-stat
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-router
+- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-fluentd

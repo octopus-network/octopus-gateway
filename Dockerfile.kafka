@@ -1,0 +1,7 @@
+FROM fluent/fluentd:v1.14.4-debian-1.0
+
+USER root
+
+RUN gem install fluent-plugin-kafka -v 0.17.3 && gem install fluent-plugin-grep -v 0.3.4
+
+USER fluent

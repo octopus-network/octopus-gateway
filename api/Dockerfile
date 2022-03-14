@@ -5,7 +5,7 @@ FROM golang:1.17-bullseye AS build
 
 WORKDIR /go/src/app
 
-ADD ./api /go/src/app
+ADD . /go/src/app
 
 RUN go get -d -v ./...
 
