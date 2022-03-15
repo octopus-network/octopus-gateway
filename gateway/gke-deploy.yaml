@@ -8,60 +8,6 @@ data:
   GATEWAY_API_ROUTE_URL: http://octopus-gateway-api/route
 
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  namespace: gateway
-  name: octopus-gateway-router-secret
-stringData:
-  fluentd.conf: |-
-    <source>
-        @type tail
-        @label @GATEWAY
-        path /var/log/gateway/gateway*.log
-        pos_file /fluentd/log/gateway.log.pos
-        tag gateway.**
-        read_from_head true
-        follow_inodes true
-        <parse>
-            @type json
-        </parse>
-    </source>
-
-    <label @GATEWAY>
-        <filter gateway.**>
-            @type grep
-            <regexp>
-                key msg
-                pattern /^(request|response|subscription)$/
-            </regexp>
-        </filter>
-
-        <match gateway.**>
-            @type kafka2
-            brokers <brokers>
-            default_topic <topic>
-            partition_key_key path
-            use_event_time true
-            get_kafka_client_log true
-            # max_send_limit_bytes 1000000
-            
-            ssl_ca_certs_from_system true
-            sasl_over_ssl true
-            username <username>
-            password <password>
-            
-            <format>
-                @type json
-            </format>
-            # https://docs.fluentd.org/configuration/buffer-section
-            <buffer octopus_gateway>
-                flush_mode immediate
-            </buffer>
-        </match>
-    </label>
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -90,23 +36,6 @@ spec:
             configMapKeyRef:
               name: octopus-gateway-router-configmap
               key: GATEWAY_API_ROUTE_URL
-        volumeMounts:
-        - name: router-log
-          mountPath: /octopus-gateway/logs
-      - name: fluentd
-        image: asia-northeast1-docker.pkg.dev/bigdata-329111/octopus/octopus-gateway-fluentd@sha256:d580b7c7ff52ce5b81b44937de297111d6f5a0bcd49aaacc5529f040e3fbeec7
-        volumeMounts:
-        - name: router-secret-volume
-          mountPath: /fluentd/etc/fluent.conf
-          subPath: fluentd.conf
-        - name: router-log
-          mountPath: /var/log/gateway
-      volumes:
-      - name: router-log
-        emptyDir: {}
-      - name: router-secret-volume
-        secret:
-          secretName: octopus-gateway-router-secret
 
 ---
 # backendconfig: healthcheck(/health) & websocket timeout(3600s)

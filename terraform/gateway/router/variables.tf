@@ -9,7 +9,6 @@ variable "gateway_router" {
     dns_zone      = string
     replicas      = number
     router_image  = string
-    fluentd_image = string
   })
 }
 

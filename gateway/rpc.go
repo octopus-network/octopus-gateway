@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
-	"github.com/rs/xid"
 	"go.uber.org/zap"
 )
 
@@ -36,14 +36,36 @@ func (h *HttpProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (t *ProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	uuid := xid.New().String()
-	dumpRequest(req, uuid, true)
+	ts := time.Now()
+	_, id, method, err := parseRequest(req)
+	if err != nil {
+		zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse request | %s", err))
+	}
+
+	var result interface{}
+	var _error interface{}
 	resp, err := t.RoundTripper.RoundTrip(req)
 	if err == nil {
-		dumpResponse(resp, uuid, true)
+		result, _error, err = parseResponse(resp)
+		if err != nil {
+			zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse response | %s", err))
+		}
 	}
+
+	zap.S().Infow("request",
+		"path", req.URL.Path,
+		"id", id,
+		"method", method,
+		"error", _error,
+		"length", result,
+		"timestamp", ts.Unix(),
+		"duration", time.Since(ts))
+
 	return resp, err
 }
+
+// https://github.com/polkadot-js/api/blob/master/packages/rpc-provider/src/types.ts
+// https://github.com/polkadot-js/api/blob/master/packages/rpc-provider/src/coder/index.ts
 
 func drainBody(b io.ReadCloser) (r1 io.ReadCloser, r2 []byte, err error) {
 	if b == nil || b == http.NoBody {
@@ -60,28 +82,30 @@ func drainBody(b io.ReadCloser) (r1 io.ReadCloser, r2 []byte, err error) {
 	return io.NopCloser(&buf), buf.Bytes(), nil
 }
 
-func dumpRequest(req *http.Request, uuid string, body bool) error {
-	var err error
+func parseRequest(req *http.Request) (version, id, method interface{}, err error) {
 	var copy []byte
 	save := req.Body
 
 	if req.Body != nil {
 		save, copy, err = drainBody(req.Body)
 		if err != nil {
-			return err
+			return
 		}
 
-		addr := req.RemoteAddr
-		path := req.URL.Path
-		dumpJsonRpcRequest(uuid, addr, path, copy, body)
+		var jsonMap map[string]interface{}
+		if err = json.Unmarshal(copy, &jsonMap); err != nil {
+			return
+		}
+		version = jsonMap["jsonrpc"]
+		id = jsonMap["id"]
+		method = jsonMap["method"]
 	}
 
 	req.Body = save
-	return nil
+	return
 }
 
-func dumpResponse(resp *http.Response, uuid string, body bool) error {
-	var err error
+func parseResponse(resp *http.Response) (result, _error interface{}, err error) {
 	var copy []byte
 	save := resp.Body
 	savecl := resp.ContentLength
@@ -89,102 +113,18 @@ func dumpResponse(resp *http.Response, uuid string, body bool) error {
 	if resp.Body != nil {
 		save, copy, err = drainBody(resp.Body)
 		if err != nil {
-			return err
+			return
 		}
 
-		req := resp.Request
-		addr := req.RemoteAddr
-		path := req.URL.Path
-		dumpJsonRpcResponse(uuid, addr, path, copy, body)
+		var jsonMap map[string]interface{}
+		if err = json.Unmarshal(copy, &jsonMap); err != nil {
+			return
+		}
+		result = len(copy) //jsonMap["result"]
+		_error = jsonMap["error"]
 	}
 
 	resp.Body = save
 	resp.ContentLength = savecl
-	return nil
-}
-
-// https://github.com/polkadot-js/api/blob/master/packages/rpc-provider/src/types.ts
-// https://github.com/polkadot-js/api/blob/master/packages/rpc-provider/src/coder/index.ts
-
-const DumpBodyMaximumSize = 1024
-
-func dumpJsonRpcRequest(uuid, addr, path string, data []byte, body bool) error {
-	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(data, &jsonMap); err != nil {
-		return err
-	}
-
-	version := jsonMap["jsonrpc"]
-	if version != "2.0" {
-		return errors.New("jsonrpc: invalid jsonrpc field in decoded object")
-	}
-
-	id := jsonMap["id"]
-	method := jsonMap["method"]
-	// params := jsonMap["params"]
-	if id == nil || method == nil {
-		return errors.New("jsonrpc: invalid id/method field in decoded object")
-	}
-
-	zap.S().Infow("request",
-		"uuid", uuid,
-		"remote", addr,
-		"path", path,
-		"id", id,
-		"method", method)
-	// "params", params)
-	return nil
-}
-
-func dumpJsonRpcResponse(uuid, addr, path string, data []byte, body bool) error {
-	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(data, &jsonMap); err != nil {
-		return err
-	}
-
-	version := jsonMap["jsonrpc"]
-	if version != "2.0" {
-		return errors.New("jsonrpc: invalid jsonrpc field in decoded object")
-	}
-
-	id := jsonMap["id"]
-	if id != nil {
-		_error := jsonMap["error"]
-		var result interface{}
-		if body && len(data) < DumpBodyMaximumSize {
-			result = jsonMap["result"]
-		}
-		zap.S().Infow("response",
-			"uuid", uuid,
-			"remote", addr,
-			"path", path,
-			"id", id,
-			"result", result,
-			"error", _error,
-			"length", len(data))
-		return nil
-	}
-
-	method := jsonMap["method"]
-	params, _ := jsonMap["params"].(map[string]interface{})
-	if method != nil && params != nil {
-		subscription := params["subscription"]
-		_error := params["error"]
-		var result interface{}
-		if body && len(data) < DumpBodyMaximumSize {
-			result = params["result"]
-		}
-		zap.S().Infow("subscription",
-			"uuid", uuid,
-			"remote", addr,
-			"path", path,
-			"method", method,
-			"subscription", subscription,
-			"result", result,
-			"error", _error,
-			"length", len(data))
-		return nil
-	}
-
-	return errors.New("jsonrpc: invalid id field in decoded object")
+	return
 }

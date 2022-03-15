@@ -12,22 +12,7 @@ steps:
   - push
   - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-router
 
-# fluentd sidecar
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-  - build
-  - -t
-  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-fluentd
-  - -f
-  - fluentd/Dockerfile.kafka
-  - .
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-  - push
-  - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-fluentd
-
 images:
 - us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-router
-- us-central1-docker.pkg.dev/$PROJECT_ID/octopus/$REPO_NAME-fluentd
 
 # gcloud builds submit --config=cloudbuild.yaml --substitutions=REPO_NAME="octopus-gateway"

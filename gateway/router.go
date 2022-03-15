@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // const rateLimitPath = "/limit"
@@ -43,7 +44,7 @@ func NewRouter(routeChecker string) *Router {
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Health Check
 	if req.URL.Path == healthCheckPath {
-		log.Println(fmt.Sprintf("[%d] %s", http.StatusOK, req.URL.Path))
+		zap.S().Infow("health", "path", req.URL.Path)
 		http.Error(rw, http.StatusText(http.StatusOK), http.StatusOK)
 		return
 	}
@@ -52,7 +53,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	re := regexp.MustCompile(`^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`)
 	params := re.FindStringSubmatch(req.URL.Path)
 	if len(params) < 3 {
-		log.Println(fmt.Sprintf("[%d] %s", http.StatusBadRequest, req.URL.Path))
+		zap.S().Errorw("router", "path", req.URL.Path, "statue", http.StatusBadRequest)
 		http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -61,13 +62,13 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Check if the request should be routed
 	routeResp := RouteResponse{}
 	if err := r.shouldRoute(chain, project, &routeResp); err != nil {
-		log.Println(fmt.Sprintf("[%d] %s", http.StatusInternalServerError, req.URL.Path))
+		zap.S().Errorw("router", "path", req.URL.Path, "statue", http.StatusInternalServerError)
 		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	if !routeResp.Route {
-		log.Println(fmt.Sprintf("[%d] %s", http.StatusForbidden, req.URL.Path))
+		zap.S().Errorw("router", "path", req.URL.Path, "statue", http.StatusForbidden)
 		http.Error(rw, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 		return
 	}
@@ -78,7 +79,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		value = r.addRoute(chain, routeResp.Target.RPC, routeResp.Target.WS)
 	}
 	if value == nil {
-		log.Println(fmt.Sprintf("[%d] %s", http.StatusNotFound, req.URL.Path))
+		zap.S().Errorw("router", "path", req.URL.Path, "statue", http.StatusNotFound)
 		http.Error(rw, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
@@ -88,19 +89,19 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	switch req.URL.Scheme {
 	case "http":
 	case "https":
-		log.Println("[rpc]", req.URL.Path)
+		zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.RPC)
 		proxy.rpc.ServeHTTP(rw, req)
 	case "ws":
 	case "wss":
-		log.Println("[wss]", req.URL.Path)
+		zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.WS)
 		proxy.ws.ServeHTTP(rw, req)
 	default:
 		// TODO: connection := req.Header.Get("Connection")
 		if upgrade := req.Header.Get("Upgrade"); upgrade == "websocket" {
-			log.Println("[wss]", req.URL.Path)
+			zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.WS)
 			proxy.ws.ServeHTTP(rw, req)
 		} else {
-			log.Println("[rpc]", req.URL.Path)
+			zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.RPC)
 			proxy.rpc.ServeHTTP(rw, req)
 		}
 	}

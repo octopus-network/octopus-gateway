@@ -1,17 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/rs/xid"
+	"go.uber.org/zap"
 )
 
 var (
@@ -72,15 +73,13 @@ func NewWebsocketProxy(target *url.URL) *WebsocketProxy {
 // ServeHTTP implements the http.Handler that proxies WebSocket connections.
 func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if w.Backend == nil {
-		log.Println("websocketproxy: backend function is not defined")
-		http.Error(rw, "internal server error (code: 1)", http.StatusInternalServerError)
+		http.Error(rw, http.StatusText(http.StatusServiceUnavailable), http.StatusInternalServerError)
 		return
 	}
 
 	backendURL := w.Backend(req)
 	if backendURL == nil {
-		log.Println("websocketproxy: backend URL is nil")
-		http.Error(rw, "internal server error (code: 2)", http.StatusInternalServerError)
+		http.Error(rw, http.StatusText(http.StatusServiceUnavailable), http.StatusInternalServerError)
 		return
 	}
 
@@ -144,13 +143,13 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// http://tools.ietf.org/html/draft-ietf-hybi-websocket-multiplexing-01
 	connBackend, resp, err := dialer.Dial(backendURL.String(), requestHeader)
 	if err != nil {
-		log.Printf("websocketproxy: couldn't dial to remote backend url %s", err)
+		zap.S().Errorw(fmt.Sprintf("ws: couldn't dial to remote backend url | %s", err))
 		if resp != nil {
 			// If the WebSocket handshake fails, ErrBadHandshake is returned
 			// along with a non-nil *http.Response so that callers can handle
 			// redirects, authentication, etcetera.
 			if err := copyResponse(rw, resp); err != nil {
-				log.Printf("websocketproxy: couldn't write response after failed remote backend handshake: %s", err)
+				zap.S().Errorw(fmt.Sprintf("ws: couldn't write response after failed remote backend handshake | %s", err))
 			}
 		} else {
 			http.Error(rw, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
@@ -178,14 +177,14 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Also pass the header that we gathered from the Dial handshake.
 	connPub, err := upgrader.Upgrade(rw, req, upgradeHeader)
 	if err != nil {
-		log.Printf("websocketproxy: couldn't upgrade %s", err)
+		zap.S().Errorw(fmt.Sprintf("ws: couldn't upgrade | %s", err))
 		return
 	}
 	defer connPub.Close()
 
 	errClient := make(chan error, 1)
 	errBackend := make(chan error, 1)
-	replicateWebsocketConn := func(dst, src *websocket.Conn, errc chan error, logger func(data []byte) error) {
+	replicateWebsocketConn := func(dst, src *websocket.Conn, errc chan error, logger func(data []byte)) {
 		for {
 			msgType, msg, err := src.ReadMessage()
 			if err != nil {
@@ -205,19 +204,79 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				break
 			}
 
-			// Log request/response
+			// Log request/response & subscription
 			logger(msg)
 		}
 	}
 
-	uuid := xid.New().String()
-	addr := connPub.RemoteAddr().String() // + "->" + connBackend.LocalAddr().String()
-	path := req.URL.Path
-	logRequest := func(data []byte) error {
-		return dumpJsonRpcRequest(uuid, addr, path, data, true)
+	// Log request/response & subscription
+	type request struct {
+		Id        interface{}
+		Method    interface{}
+		Timestamp time.Time
 	}
-	logResponse := func(data []byte) error {
-		return dumpJsonRpcResponse(uuid, addr, path, data, true)
+
+	var requestCache = struct {
+		sync.RWMutex // read & write simultaneously?
+		m            map[interface{}]request
+	}{m: make(map[interface{}]request)}
+
+	logRequest := func(data []byte) {
+		var jsonMap map[string]interface{}
+		if err := json.Unmarshal(data, &jsonMap); err != nil {
+			zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse request | %s", err))
+			return
+		}
+
+		id := jsonMap["id"]
+		requestCache.Lock()
+		requestCache.m[id] = request{id, jsonMap["method"], time.Now()}
+		requestCache.Unlock()
+	}
+
+	logResponse := func(data []byte) {
+		var jsonMap map[string]interface{}
+		if err := json.Unmarshal(data, &jsonMap); err != nil {
+			zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse response | %s", err))
+			return
+		}
+
+		id := jsonMap["id"]
+		if id != nil {
+			requestCache.RLock()
+			v, ok := requestCache.m[id]
+			requestCache.RUnlock()
+			if ok {
+				zap.S().Infow("request",
+					"path", req.URL.Path,
+					"id", v.Id,
+					"method", v.Method,
+					"error", jsonMap["error"],
+					"length", len(data),
+					"timestamp", v.Timestamp.Unix(),
+					"duration", time.Since(v.Timestamp))
+				requestCache.Lock()
+				delete(requestCache.m, id)
+				requestCache.Unlock()
+			} else {
+				zap.S().Errorw(fmt.Sprintf("ws: couldn't get request %v %s", id, req.URL.Path))
+			}
+		} else {
+			method := jsonMap["method"]
+			params, _ := jsonMap["params"].(map[string]interface{})
+			if method != nil && params != nil {
+				zap.S().Infow("subscription",
+					"path", req.URL.Path,
+					"subscription", params["subscription"],
+					"method", method,
+					"error", params["error"],
+					"length", len(data),
+					"timestamp", time.Now().Unix(),
+					"duration", 0)
+			} else {
+				zap.S().Errorw(fmt.Sprintf("ws: response or subscription %s", req.URL.Path))
+			}
+		}
 	}
 
 	go replicateWebsocketConn(connPub, connBackend, errClient, logResponse)
@@ -226,12 +285,12 @@ func (w *WebsocketProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	var message string
 	select {
 	case err = <-errClient:
-		message = "websocketproxy: Error when copying from backend to client: %v"
+		message = "ws: Error when copying from backend to client | %v"
 	case err = <-errBackend:
-		message = "websocketproxy: Error when copying from client to backend: %v"
+		message = "ws: Error when copying from client to backend | %v"
 	}
 	if e, ok := err.(*websocket.CloseError); !ok || e.Code == websocket.CloseAbnormalClosure {
-		log.Printf(message, err)
+		zap.S().Errorw(fmt.Sprintf(message, err))
 	}
 }
 
