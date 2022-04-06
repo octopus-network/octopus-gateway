@@ -40,20 +40,6 @@ variable "gateway_router" {
   })
 }
 
-# kafka
-variable "kafka" {
-  description = "KAFKA Configuration"
-  type        = object({
-    hosts = string
-    topic = string
-    sasl = object({
-      mechanisms = string
-      username   = string
-      password   = string
-    })
-  })
-}
-
 # postgresql
 variable "postgresql" {
   description = "PostgreSQL Configuration"

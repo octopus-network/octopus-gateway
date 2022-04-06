@@ -12,15 +12,3 @@ variable "gateway_router" {
   })
 }
 
-variable "kafka" {
-  description = "KAFKA Configuration"
-  type        = object({
-    hosts = string
-    topic = string
-    sasl = object({
-      mechanisms = string
-      username   = string
-      password   = string
-    })
-  })
-}
