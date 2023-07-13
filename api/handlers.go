@@ -14,9 +14,10 @@ import (
 )
 
 type Chain struct {
-	ID  string `json:"id" db:"id" validate:"required"`
-	RPC string `json:"rpc" db:"rpc" validate:"url"`
-	WS  string `json:"ws" db:"ws" validate:"url"`
+	ID   string `json:"id" db:"id" validate:"required"`
+	RPC  string `json:"rpc" db:"rpc" validate:"url"`
+	WS   string `json:"ws" db:"ws" validate:"omitempty,url"`
+	GRPC string `json:"grpc" db:"grpc" validate:"omitempty,url"`
 }
 
 type Project struct {
@@ -31,8 +32,9 @@ type Project struct {
 type Route struct {
 	Route  bool `json:"route"`
 	Target struct {
-		RPC string `json:"rpc" default:""`
-		WS  string `json:"ws" default:""`
+		RPC  string `json:"rpc" default:""`
+		WS   string `json:"ws" default:""`
+		GRPC string `json:"grpc" default:""`
 	} `json:"target"`
 }
 
@@ -97,7 +99,7 @@ func (h *Handler) CreateChain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws)`, chain); err != nil {
+	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws,:grpc)`, chain); err != nil {
 		// UniqueViolation 23505
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			render.Respond(w, r, NewResponse(http.StatusConflict, nil, err))
@@ -164,7 +166,6 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//
 func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 	chainID, projectID := chi.URLParam(r, "chainID"), chi.URLParam(r, "projectID")
 	if chainID == "" || projectID == "" {
@@ -188,11 +189,13 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 	route := Route{
 		Route: true,
 		Target: struct {
-			RPC string `json:"rpc" default:""`
-			WS  string `json:"ws" default:""`
+			RPC  string `json:"rpc" default:""`
+			WS   string `json:"ws" default:""`
+			GRPC string `json:"grpc" default:""`
 		}{
-			RPC: chain.RPC,
-			WS:  chain.WS,
+			RPC:  chain.RPC,
+			WS:   chain.WS,
+			GRPC: chain.GRPC,
 		},
 	}
 	h.cache.Add(r.URL.Path, &route)
