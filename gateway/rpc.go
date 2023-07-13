@@ -25,9 +25,18 @@ type HttpProxy struct {
 }
 
 func NewHttpProxy(target *url.URL) *HttpProxy {
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	// proxy.Director = func(r *http.Request) {}
-	proxy.Transport = &ProxyTransport{http.DefaultTransport}
+	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.URL.Path = target.Path
+		req.URL.RawPath = target.RawPath
+		req.URL.RawQuery = target.RawQuery
+	}
+	transport := &ProxyTransport{http.DefaultTransport}
+	proxy := &httputil.ReverseProxy{
+		Director:  director,
+		Transport: transport,
+	}
 	return &HttpProxy{Proxy: proxy}
 }
 
@@ -58,7 +67,7 @@ func (t *ProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	zap.S().Infow("request",
-		"path", req.URL.Path,
+		"path", req.RequestURI,
 		"id", id,
 		"method", method,
 		"error", _error,
