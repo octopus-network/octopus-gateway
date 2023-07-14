@@ -29,8 +29,9 @@ type (
 	RouteResponse struct {
 		Route  bool `json:"route"`
 		Target struct {
-			RPC string `json:"rpc"`
-			WS  string `json:"ws"`
+			RPC  string `json:"rpc"`
+			WS   string `json:"ws"`
+			GRPC string `json:"grpc"`
 		} `json:"target"`
 	}
 )
@@ -110,11 +111,14 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (r *Router) addRoute(chain string, rpc string, ws string) interface{} {
 	u1, _ := url.Parse(rpc)
 	u2, _ := url.Parse(ws)
-	if u1 == nil || u2 == nil {
+	if u1 == nil {
 		return nil
 	}
 
-	proxy := &Proxy{rpc: NewHttpProxy(u1), ws: NewWebsocketProxy(u2)}
+	proxy := &Proxy{rpc: NewHttpProxy(u1)}
+	if u2 != nil {
+		proxy.ws = NewWebsocketProxy(u2)
+	}
 	actual, _ := r.routes.LoadOrStore(chain, proxy)
 	return actual
 }

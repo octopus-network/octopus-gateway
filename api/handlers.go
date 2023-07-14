@@ -17,7 +17,7 @@ type Chain struct {
 	ID   string `json:"id" db:"id" validate:"required"`
 	RPC  string `json:"rpc" db:"rpc" validate:"url"`
 	WS   string `json:"ws" db:"ws" validate:"omitempty,url"`
-	GRPC string `json:"grpc" db:"grpc" validate:"omitempty,url"`
+	GRPC string `json:"grpc" db:"grpc" validate:"omitempty,hostname_port"`
 }
 
 type Project struct {
