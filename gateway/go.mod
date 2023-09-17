@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/mwitkow/grpc-proxy v0.0.0-20230212185441-f345521cb9c9
-	github.com/soheilhy/cmux v0.1.5
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.56.2
 )
