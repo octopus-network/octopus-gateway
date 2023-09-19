@@ -13,18 +13,18 @@ import (
 	"go.uber.org/zap"
 )
 
-type ProxyTransport struct {
+type JsonRpcProxyTransport struct {
 	http.RoundTripper
 }
 
-type HttpProxy struct {
+type JsonRpcProxy struct {
 	// ReverseProxy is an HTTP Handler that takes an incoming request and
 	// sends it to another server, proxying the response back to the
 	// client.
 	Proxy *httputil.ReverseProxy
 }
 
-func NewHttpProxy(target *url.URL) *HttpProxy {
+func NewJsonRpcProxy(target *url.URL) *JsonRpcProxy {
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
@@ -32,19 +32,19 @@ func NewHttpProxy(target *url.URL) *HttpProxy {
 		req.URL.RawPath = target.RawPath
 		req.URL.RawQuery = target.RawQuery
 	}
-	transport := &ProxyTransport{http.DefaultTransport}
+	transport := &JsonRpcProxyTransport{http.DefaultTransport}
 	proxy := &httputil.ReverseProxy{
 		Director:  director,
 		Transport: transport,
 	}
-	return &HttpProxy{Proxy: proxy}
+	return &JsonRpcProxy{Proxy: proxy}
 }
 
-func (h *HttpProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (h *JsonRpcProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	h.Proxy.ServeHTTP(rw, req)
 }
 
-func (t *ProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *JsonRpcProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// 20221119 patch cors http method options
 	if req.Method == http.MethodOptions {
 		return http.DefaultTransport.RoundTrip(req)

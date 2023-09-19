@@ -18,6 +18,7 @@ type Chain struct {
 	RPC  string `json:"rpc" db:"rpc" validate:"url"`
 	WS   string `json:"ws" db:"ws" validate:"omitempty,url"`
 	GRPC string `json:"grpc" db:"grpc" validate:"omitempty,hostname_port"`
+	REST string `json:"rest" db:"rest" validate:"omitempty,url"`
 }
 
 type Project struct {
@@ -35,6 +36,7 @@ type Route struct {
 		RPC  string `json:"rpc" default:""`
 		WS   string `json:"ws" default:""`
 		GRPC string `json:"grpc" default:""`
+		REST string `json:"rest" default:""`
 	} `json:"target"`
 }
 
@@ -99,7 +101,7 @@ func (h *Handler) CreateChain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws,:grpc)`, chain); err != nil {
+	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws,:grpc,:rest)`, chain); err != nil {
 		// UniqueViolation 23505
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			render.Respond(w, r, NewResponse(http.StatusConflict, nil, err))
@@ -192,10 +194,12 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 			RPC  string `json:"rpc" default:""`
 			WS   string `json:"ws" default:""`
 			GRPC string `json:"grpc" default:""`
+			REST string `json:"rest" default:""`
 		}{
 			RPC:  chain.RPC,
 			WS:   chain.WS,
 			GRPC: chain.GRPC,
+			REST: chain.REST,
 		},
 	}
 	h.cache.Add(r.URL.Path, &route)
