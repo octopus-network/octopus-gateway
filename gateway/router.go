@@ -14,6 +14,8 @@ import (
 
 // const rateLimitPath = "/limit"
 const healthCheckPath = "/health"
+const v1PathRegex = `^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`
+const v2PathRegex = `^/(rpc|lcd)/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})?(?P<path>[^?#]*)$`
 
 type (
 	Proxy struct {
@@ -52,24 +54,30 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// - json-rpc
+	// - v1 json-rpc
 	//    POST /myriad/sbbdluuarbc524e9h3zd2fu4macyl306
-	// - cosmos rest via gRPC-gateway
-	//    GET  /cosmos/bank/v1beta1/balances/{address}
-	//    Header "prefix-path: /myriad/sbbdluuarbc524e9h3zd2fu4macyl306"
+	// - v2 json-rpc (websocket)
+	//    POST /rpc/myriad/sbbdluuarbc524e9h3zd2fu4macyl306[/websocket]
+	// - v2 cosmos rest via gRPC-gateway
+	//    GET  /lcd/myriad/sbbdluuarbc524e9h3zd2fu4macyl306/cosmos/bank/v1beta1/balances/{address}
 	isJsonRpc := true
-	re := regexp.MustCompile(`^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`)
-	params := re.FindStringSubmatch(req.URL.Path)
+	v1re, v2re := regexp.MustCompile(v1PathRegex), regexp.MustCompile(v2PathRegex)
+	params := v1re.FindStringSubmatch(req.URL.Path)
 	if len(params) != 3 {
-		params = re.FindStringSubmatch(req.Header.Get(prefixPathKey))
-		if len(params) != 3 {
+		params = v2re.FindStringSubmatch(req.URL.Path)
+		if len(params) != 5 {
 			zap.S().Errorw("router", "path", req.URL.Path, "status", http.StatusBadRequest)
 			http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			return
 		}
-		isJsonRpc = false
+		if params[1] == "lcd" {
+			isJsonRpc = false
+		}
 	}
 	chain, project := params[1], params[2]
+	if len(params) == 5 && (params[1] == "lcd" || params[1] == "rpc") {
+		chain, project = params[2], params[3]
+	}
 
 	// Check if the request should be routed
 	routeResp := RouteResponse{}
@@ -105,7 +113,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.RPC)
 			proxy.rpc.ServeHTTP(rw, req)
 		} else {
-			zap.S().Infow("router", "path", req.URL.Path, "header", req.Header.Get(prefixPathKey), "target", routeResp.Target.REST)
+			zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.REST)
 			proxy.rest.ServeHTTP(rw, req)
 		}
 	case "ws":
@@ -122,7 +130,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.RPC)
 				proxy.rpc.ServeHTTP(rw, req)
 			} else {
-				zap.S().Infow("router", "path", req.URL.Path, "header", req.Header.Get(prefixPathKey), "target", routeResp.Target.REST)
+				zap.S().Infow("router", "path", req.URL.Path, "target", routeResp.Target.REST)
 				proxy.rest.ServeHTTP(rw, req)
 			}
 		}

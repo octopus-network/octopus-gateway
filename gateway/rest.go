@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"time"
 
 	"go.uber.org/zap"
@@ -14,7 +15,25 @@ type RestProxy struct {
 }
 
 func NewRestProxy(target *url.URL) *RestProxy {
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	// proxy := httputil.NewSingleHostReverseProxy(target)
+	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		// - v2 cosmos rest via gRPC-gateway
+		//    /lcd/myriad/sbbdluuarbc524e9h3zd2fu4macyl306/cosmos/bank/v1beta1/balances/{address}
+		//    --> /cosmos/bank/v1beta1/balances/{address}
+		re := regexp.MustCompile(v2PathRegex)
+		params := re.FindStringSubmatch(req.URL.Path)
+		if len(params) == 5 {
+			req.URL.Path = params[4]
+			req.URL.RawPath = params[4]
+		} else {
+			req.URL.Path = target.Path
+			req.URL.RawPath = target.RawPath
+			req.URL.RawQuery = target.RawQuery
+		}
+	}
+	proxy := &httputil.ReverseProxy{Director: director}
 	return &RestProxy{Proxy: proxy}
 }
 
