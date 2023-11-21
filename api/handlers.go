@@ -202,10 +202,12 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 			ETH_RPC string `json:"eth_rpc" default:""`
 			ETH_WS  string `json:"eth_ws" default:""`
 		}{
-			RPC:  chain.RPC,
-			WS:   chain.WS,
-			GRPC: chain.GRPC,
-			REST: chain.REST,
+			RPC:     chain.RPC,
+			WS:      chain.WS,
+			GRPC:    chain.GRPC,
+			REST:    chain.REST,
+			ETH_RPC: chain.ETH_RPC,
+			ETH_WS:  chain.ETH_WS,
 		},
 	}
 	h.cache.Add(r.URL.Path, &route)
