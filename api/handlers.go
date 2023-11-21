@@ -172,6 +172,11 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) Clear(w http.ResponseWriter, r *http.Request) {
+	h.cache.Purge()
+	render.Respond(w, r, NewResponse(http.StatusOK, nil, nil))
+}
+
 func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 	chainID, projectID := chi.URLParam(r, "chainID"), chi.URLParam(r, "projectID")
 	if chainID == "" || projectID == "" {
@@ -222,6 +227,7 @@ func NewRouter(db *sqlx.DB) *chi.Mux {
 
 	h := NewHandler(db)
 	r.Get("/health", h.Health)
+	r.Get("/clear", h.Clear)
 	r.Get("/route/{chainID}/{projectID}", h.Route)
 	r.Route("/chains", func(r chi.Router) {
 		r.Get("/", h.ListChains)
