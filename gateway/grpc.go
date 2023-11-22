@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const prefixPathKey = "prefix-path"
+const prefixPathKey = "x-tls-sni-hostname"
 
 // Creates a gRPC server that acts as a proxy and routes incoming requests.
 func buildGrpcProxyServer(routeChecker string) *grpc.Server {
@@ -58,13 +58,13 @@ func buildGrpcProxyServer(routeChecker string) *grpc.Server {
 }
 
 func shouldRoute(routeChecker, prefixPath string) (string, error) {
-	re := regexp.MustCompile(`^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`)
+	re := regexp.MustCompile(`^(?P<project>[a-z0-9]{32})\.(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)\..+$`)
 	params := re.FindStringSubmatch(prefixPath)
 	if len(params) < 3 {
 		zap.S().Errorw("grpc", "path", prefixPath, "statue", http.StatusBadRequest)
 		return "", errors.New(http.StatusText(http.StatusBadRequest))
 	}
-	chain, project := params[1], params[2]
+	chain, project := params[2], params[1]
 
 	// Route URL: http://gateway-api/route/{chain_id}/{project_id}
 	client := &http.Client{Timeout: 1 * time.Second}
