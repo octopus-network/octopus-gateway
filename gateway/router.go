@@ -14,8 +14,8 @@ import (
 
 // const rateLimitPath = "/limit"
 const healthCheckPath = "/health"
-const v1PathRegex = `^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})$`
-const v2PathRegex = `^/(rpc|lcd|eth)/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32})?(?P<path>[^?#]*)$`
+const v1PathRegex = `^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32}|[a-z0-9]{16})$`
+const v2PathRegex = `^/(rpc|lcd|eth)/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32}|[a-z0-9]{16})(?:\/|$)(?P<path>[^?#]*)$`
 
 type (
 	Proxy struct {

@@ -58,7 +58,7 @@ func buildGrpcProxyServer(routeChecker string) *grpc.Server {
 }
 
 func shouldRoute(routeChecker, prefixPath string) (string, error) {
-	re := regexp.MustCompile(`^(?P<project>[a-z0-9]{32})\.(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)\..+$`)
+	re := regexp.MustCompile(`^(?P<project>[a-z0-9]{32}|[a-z0-9]{16})\.(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)\..+$`)
 	params := re.FindStringSubmatch(prefixPath)
 	if len(params) < 3 {
 		zap.S().Errorw("grpc", "path", prefixPath, "statue", http.StatusBadRequest)

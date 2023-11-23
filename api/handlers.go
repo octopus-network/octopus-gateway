@@ -153,7 +153,7 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project.ID = RandStringBytesRemainder(32)
+	project.ID = RandStringBytesRemainder(16)
 	project.Secret = RandStringBytesRemainder(32)
 	project.Status = "Active"
 	// project.CreateTime = time.Now()
