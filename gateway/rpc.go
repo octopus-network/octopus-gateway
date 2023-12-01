@@ -46,7 +46,7 @@ func (h *JsonRpcProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 func (t *JsonRpcProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// 20221119 patch cors http method options
-	if req.Method == http.MethodOptions {
+	if req.Method != http.MethodPost {
 		return http.DefaultTransport.RoundTrip(req)
 	}
 
