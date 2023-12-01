@@ -15,6 +15,7 @@ import (
 
 type JsonRpcProxyTransport struct {
 	http.RoundTripper
+	Through bool
 }
 
 type JsonRpcProxy struct {
@@ -24,7 +25,7 @@ type JsonRpcProxy struct {
 	Proxy *httputil.ReverseProxy
 }
 
-func NewJsonRpcProxy(target *url.URL) *JsonRpcProxy {
+func NewJsonRpcProxy(target *url.URL, through bool) *JsonRpcProxy {
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
@@ -32,7 +33,7 @@ func NewJsonRpcProxy(target *url.URL) *JsonRpcProxy {
 		req.URL.RawPath = target.RawPath
 		req.URL.RawQuery = target.RawQuery
 	}
-	transport := &JsonRpcProxyTransport{http.DefaultTransport}
+	transport := &JsonRpcProxyTransport{http.DefaultTransport, through}
 	proxy := &httputil.ReverseProxy{
 		Director:  director,
 		Transport: transport,
@@ -45,6 +46,9 @@ func (h *JsonRpcProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (t *JsonRpcProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.Through {
+		return http.DefaultTransport.RoundTrip(req)
+	}
 	// 20221119 patch cors http method options
 	if req.Method != http.MethodPost {
 		return http.DefaultTransport.RoundTrip(req)
