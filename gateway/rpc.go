@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,9 +16,20 @@ import (
 	"go.uber.org/zap"
 )
 
+type JsonRpcRequest struct {
+	Id     *json.RawMessage `json:"id"`
+	Method string           `json:"method"`
+	Params *json.RawMessage `json:"params"`
+}
+
+type JsonRpcResponse struct {
+	Id     *json.RawMessage `json:"id"`
+	Result *json.RawMessage `json:"result"`
+	Error  any              `json:"error"`
+}
+
 type JsonRpcProxyTransport struct {
 	http.RoundTripper
-	Through bool
 }
 
 type JsonRpcProxy struct {
@@ -25,7 +39,7 @@ type JsonRpcProxy struct {
 	Proxy *httputil.ReverseProxy
 }
 
-func NewJsonRpcProxy(target *url.URL, through bool) *JsonRpcProxy {
+func NewJsonRpcProxy(target *url.URL) *JsonRpcProxy {
 	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
@@ -33,7 +47,7 @@ func NewJsonRpcProxy(target *url.URL, through bool) *JsonRpcProxy {
 		req.URL.RawPath = target.RawPath
 		req.URL.RawQuery = target.RawQuery
 	}
-	transport := &JsonRpcProxyTransport{http.DefaultTransport, through}
+	transport := &JsonRpcProxyTransport{http.DefaultTransport}
 	proxy := &httputil.ReverseProxy{
 		Director:  director,
 		Transport: transport,
@@ -46,38 +60,96 @@ func (h *JsonRpcProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (t *JsonRpcProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if t.Through {
-		return http.DefaultTransport.RoundTrip(req)
-	}
 	// 20221119 patch cors http method options
 	if req.Method != http.MethodPost {
 		return http.DefaultTransport.RoundTrip(req)
 	}
 
 	ts := time.Now()
-	_, id, method, err := parseRequest(req)
+	_req, err := parseRequest(req)
 	if err != nil {
-		zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse request | %s", err))
+		zap.S().Errorw(fmt.Sprintf("rpc: Parse Request Error | %s", err))
 	}
 
-	var result interface{}
-	var _error interface{}
 	resp, err := t.RoundTripper.RoundTrip(req)
-	if err == nil {
-		result, _error, err = parseResponse(resp)
-		if err != nil {
-			zap.S().Errorw(fmt.Sprintf("rpc: couldn't parse response | %s", err))
-		}
+	if err != nil {
+		zap.S().Errorw(fmt.Sprintf("rpc: Round Trip Error | %s", err))
+		return resp, err
 	}
 
-	zap.S().Infow("request",
-		"path", req.RequestURI,
-		"id", id,
-		"method", method,
-		"error", _error,
-		"length", result,
-		"timestamp", ts.Unix(),
-		"duration", time.Since(ts))
+	_resp, _len, err := parseResponse(resp)
+	if err != nil {
+		zap.S().Errorw(fmt.Sprintf("rpc: Parse Response Error | %s", err))
+	}
+
+	if _req != nil && _resp != nil {
+		switch i := _req.(type) {
+		case JsonRpcRequest:
+			switch j := _resp.(type) {
+			case JsonRpcResponse:
+				zap.S().Infow("request",
+					"path", req.RequestURI,
+					"id", i.Id,
+					"method", i.Method,
+					"error", j.Error,
+					"length", _len,
+					"timestamp", ts.Unix(),
+					"duration", time.Since(ts))
+			default:
+				zap.S().Errorw("request",
+					"path", req.RequestURI,
+					"timestamp", ts.Unix(),
+					"duration", time.Since(ts),
+					"request", "Type JsonRpcRequest",
+					"response", fmt.Sprintf("Type %T", j))
+			}
+		case []JsonRpcRequest:
+			switch j := _resp.(type) {
+			case []JsonRpcResponse:
+				randomBytes := make([]byte, 8)
+				if _, err := rand.Read(randomBytes); err != nil {
+					randomBytes = []byte("12345678")
+				}
+				randomString := base64.URLEncoding.EncodeToString(randomBytes)
+				batch := randomString[:8]
+				for _, x := range i {
+					for _, y := range j {
+						if bytes.Equal(*x.Id, *y.Id) {
+							zap.S().Infow("request",
+								"path", req.RequestURI,
+								"batch", batch,
+								"id", x.Id,
+								"method", x.Method,
+								"error", y.Error,
+								"length", _len, // batch total length
+								"timestamp", ts.Unix(),
+								"duration", time.Since(ts))
+						}
+					}
+				}
+			default:
+				zap.S().Errorw("request",
+					"path", req.RequestURI,
+					"timestamp", ts.Unix(),
+					"duration", time.Since(ts),
+					"request", "Type []JsonRpcRequest",
+					"response", fmt.Sprintf("Type %T", j))
+			}
+		default:
+			zap.S().Errorw("request",
+				"path", req.RequestURI,
+				"timestamp", ts.Unix(),
+				"duration", time.Since(ts),
+				"request", fmt.Sprintf("Type %T", i))
+		}
+	} else {
+		zap.S().Errorw("request",
+			"path", req.RequestURI,
+			"timestamp", ts.Unix(),
+			"duration", time.Since(ts),
+			"request", fmt.Sprintf("nil? %v\n", _req == nil),
+			"response", fmt.Sprintf("nil? %v\n", _resp == nil))
+	}
 
 	return resp, err
 }
@@ -100,49 +172,57 @@ func drainBody(b io.ReadCloser) (r1 io.ReadCloser, r2 []byte, err error) {
 	return io.NopCloser(&buf), buf.Bytes(), nil
 }
 
-func parseRequest(req *http.Request) (version, id, method interface{}, err error) {
-	var copy []byte
-	save := req.Body
-
-	if req.Body != nil {
-		save, copy, err = drainBody(req.Body)
-		if err != nil {
-			return
-		}
-
-		var jsonMap map[string]interface{}
-		if err = json.Unmarshal(copy, &jsonMap); err != nil {
-			return
-		}
-		version = jsonMap["jsonrpc"]
-		id = jsonMap["id"]
-		method = jsonMap["method"]
+func parseRequest(req *http.Request) (interface{}, error) {
+	if req.Body == nil {
+		return nil, nil
 	}
 
-	req.Body = save
-	return
+	var copy []byte
+	save, copy, err := drainBody(req.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var request JsonRpcRequest
+	if err = json.Unmarshal(copy, &request); err == nil {
+		req.Body = save
+		return request, nil
+	}
+
+	var requests []JsonRpcRequest
+	if err = json.Unmarshal(copy, &requests); err == nil {
+		req.Body = save
+		return requests, nil
+	}
+
+	return nil, errors.New("json: cannot unmarshal array into JsonRpcRequest or []JsonRpcRequest")
 }
 
-func parseResponse(resp *http.Response) (result, _error interface{}, err error) {
-	var copy []byte
-	save := resp.Body
-	savecl := resp.ContentLength
-
-	if resp.Body != nil {
-		save, copy, err = drainBody(resp.Body)
-		if err != nil {
-			return
-		}
-
-		var jsonMap map[string]interface{}
-		if err = json.Unmarshal(copy, &jsonMap); err != nil {
-			return
-		}
-		result = len(copy) //jsonMap["result"]
-		_error = jsonMap["error"]
+func parseResponse(resp *http.Response) (interface{}, int, error) {
+	if resp.Body == nil {
+		return nil, 0, nil
 	}
 
-	resp.Body = save
-	resp.ContentLength = savecl
-	return
+	var copy []byte
+	savecl := resp.ContentLength
+	save, copy, err := drainBody(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var response JsonRpcResponse
+	if err = json.Unmarshal(copy, &response); err == nil {
+		resp.Body = save
+		resp.ContentLength = savecl
+		return response, len(copy), nil
+	}
+
+	var responses []JsonRpcResponse
+	if err = json.Unmarshal(copy, &responses); err == nil {
+		resp.Body = save
+		resp.ContentLength = savecl
+		return responses, len(copy), nil
+	}
+
+	return nil, 0, errors.New("json: cannot unmarshal array into JsonRpcResponse or []JsonRpcResponse")
 }

@@ -178,7 +178,7 @@ func (r *Router) addRoute(chain string, rpc, ws, rest, eth_rpc, eth_ws string) i
 		return nil
 	}
 
-	proxy := &Proxy{rpc: NewJsonRpcProxy(u1, false)}
+	proxy := &Proxy{rpc: NewJsonRpcProxy(u1)}
 	if u2 != nil {
 		proxy.ws = NewWebsocketProxy(u2)
 	}
@@ -186,7 +186,7 @@ func (r *Router) addRoute(chain string, rpc, ws, rest, eth_rpc, eth_ws string) i
 		proxy.rest = NewRestProxy(u3)
 	}
 	if u4 != nil {
-		proxy.eth_rpc = NewJsonRpcProxy(u4, true)
+		proxy.eth_rpc = NewJsonRpcProxy(u4)
 	}
 	if u5 != nil {
 		proxy.eth_ws = NewWebsocketProxy(u5)
