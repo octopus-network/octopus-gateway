@@ -14,6 +14,7 @@ import (
 
 // const rateLimitPath = "/limit"
 const healthCheckPath = "/health"
+const clearRoutesPath = "/clear"
 const v1PathRegex = `^/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32}|[a-z0-9]{16})$`
 const v2PathRegex = `^/(rpc|lcd|eth)/(?P<chain>[a-z][-a-z0-9]*[a-z0-9]?)/(?P<project>[a-z0-9]{32}|[a-z0-9]{16})(?:\/|$)(?P<path>[^?#]*)$`
 
@@ -54,6 +55,23 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Health Check
 	if req.URL.Path == healthCheckPath {
 		zap.S().Infow("health", "path", req.URL.Path)
+		http.Error(rw, http.StatusText(http.StatusOK), http.StatusOK)
+		return
+	}
+
+	// Clear Routes
+	if req.URL.Path == clearRoutesPath {
+		zap.S().Infow("clear", "path", req.URL.Path)
+		r.routes.Range(func(key, value interface{}) bool {
+			// proxy := value.(*Proxy)
+			// proxy.rpc = nil
+			// proxy.ws = nil
+			// proxy.rest = nil
+			// proxy.eth_rpc = nil
+			// proxy.eth_ws = nil
+			r.routes.Delete(key)
+			return true
+		})
 		http.Error(rw, http.StatusText(http.StatusOK), http.StatusOK)
 		return
 	}
