@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/mwitkow/grpc-proxy/proxy"
@@ -21,8 +22,34 @@ import (
 
 const prefixPathKey = "x-tls-sni-hostname"
 
+type GrpcConnectionPool struct {
+	mu    sync.Mutex
+	conns map[string]*grpc.ClientConn
+}
+
+func (p *GrpcConnectionPool) getOrCreateConn(ctx context.Context, target string) (*grpc.ClientConn, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if conn, ok := p.conns[target]; ok {
+		return conn, nil
+	}
+
+	conn, err := grpc.DialContext(ctx, target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+	p.conns[target] = conn
+
+	return conn, nil
+}
+
 // Creates a gRPC server that acts as a proxy and routes incoming requests.
 func buildGrpcProxyServer(routeChecker string) *grpc.Server {
+	pool := &GrpcConnectionPool{
+		conns: make(map[string]*grpc.ClientConn),
+	}
+
 	director := func(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		outCtx := metadata.NewOutgoingContext(ctx, md.Copy())
@@ -42,8 +69,7 @@ func buildGrpcProxyServer(routeChecker string) *grpc.Server {
 			return nil, nil, status.Errorf(codes.Aborted, "Route Failed")
 		}
 
-		conn, err := grpc.DialContext(ctx, target,
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := pool.getOrCreateConn(ctx, target)
 		if err != nil {
 			zap.S().Errorw(fmt.Sprintf("grpc: couldn't dial to %s | %s", target, err))
 		}
