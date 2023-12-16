@@ -25,7 +25,7 @@ type JsonRpcRequest struct {
 type JsonRpcResponse struct {
 	Id     *json.RawMessage `json:"id"`
 	Result *json.RawMessage `json:"result"`
-	Error  any              `json:"error"`
+	Error  interface{}      `json:"error"`
 }
 
 type JsonRpcProxyTransport struct {
