@@ -14,9 +14,13 @@ import (
 )
 
 type Chain struct {
-	ID  string `json:"id" db:"id" validate:"required"`
-	RPC string `json:"rpc" db:"rpc" validate:"url"`
-	WS  string `json:"ws" db:"ws" validate:"url"`
+	ID      string `json:"id" db:"id" validate:"required"`
+	RPC     string `json:"rpc" db:"rpc" validate:"url"`
+	WS      string `json:"ws" db:"ws" validate:"omitempty,url"`
+	GRPC    string `json:"grpc" db:"grpc" validate:"omitempty,hostname_port"`
+	REST    string `json:"rest" db:"rest" validate:"omitempty,url"`
+	ETH_RPC string `json:"eth_rpc" db:"eth_rpc" validate:"omitempty,url"`
+	ETH_WS  string `json:"eth_ws" db:"eth_ws" validate:"omitempty,url"`
 }
 
 type Project struct {
@@ -31,8 +35,12 @@ type Project struct {
 type Route struct {
 	Route  bool `json:"route"`
 	Target struct {
-		RPC string `json:"rpc" default:""`
-		WS  string `json:"ws" default:""`
+		RPC     string `json:"rpc" default:""`
+		WS      string `json:"ws" default:""`
+		GRPC    string `json:"grpc" default:""`
+		REST    string `json:"rest" default:""`
+		ETH_RPC string `json:"eth_rpc" default:""`
+		ETH_WS  string `json:"eth_ws" default:""`
 	} `json:"target"`
 }
 
@@ -97,7 +105,7 @@ func (h *Handler) CreateChain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws)`, chain); err != nil {
+	if _, err := h.db.NamedExec(`INSERT INTO chains VALUES (:id,:rpc,:ws,:grpc,:rest,:eth_rpc,:eth_ws)`, chain); err != nil {
 		// UniqueViolation 23505
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			render.Respond(w, r, NewResponse(http.StatusConflict, nil, err))
@@ -145,7 +153,7 @@ func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project.ID = RandStringBytesRemainder(32)
+	project.ID = RandStringBytesRemainder(16)
 	project.Secret = RandStringBytesRemainder(32)
 	project.Status = "Active"
 	// project.CreateTime = time.Now()
@@ -164,7 +172,11 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//
+func (h *Handler) Clear(w http.ResponseWriter, r *http.Request) {
+	h.cache.Purge()
+	render.Respond(w, r, NewResponse(http.StatusOK, nil, nil))
+}
+
 func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 	chainID, projectID := chi.URLParam(r, "chainID"), chi.URLParam(r, "projectID")
 	if chainID == "" || projectID == "" {
@@ -188,11 +200,19 @@ func (h *Handler) Route(w http.ResponseWriter, r *http.Request) {
 	route := Route{
 		Route: true,
 		Target: struct {
-			RPC string `json:"rpc" default:""`
-			WS  string `json:"ws" default:""`
+			RPC     string `json:"rpc" default:""`
+			WS      string `json:"ws" default:""`
+			GRPC    string `json:"grpc" default:""`
+			REST    string `json:"rest" default:""`
+			ETH_RPC string `json:"eth_rpc" default:""`
+			ETH_WS  string `json:"eth_ws" default:""`
 		}{
-			RPC: chain.RPC,
-			WS:  chain.WS,
+			RPC:     chain.RPC,
+			WS:      chain.WS,
+			GRPC:    chain.GRPC,
+			REST:    chain.REST,
+			ETH_RPC: chain.ETH_RPC,
+			ETH_WS:  chain.ETH_WS,
 		},
 	}
 	h.cache.Add(r.URL.Path, &route)
@@ -207,6 +227,7 @@ func NewRouter(db *sqlx.DB) *chi.Mux {
 
 	h := NewHandler(db)
 	r.Get("/health", h.Health)
+	r.Get("/clear", h.Clear)
 	r.Get("/route/{chainID}/{projectID}", h.Route)
 	r.Route("/chains", func(r chi.Router) {
 		r.Get("/", h.ListChains)
